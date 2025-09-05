@@ -1,0 +1,135 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://api.recommendations.example.com/schemas/content-item.json",
+  "title": "Content Item",
+  "description": "Schema for validating content item input",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]+$",
+      "minLength": 1,
+      "maxLength": 100,
+      "description": "Unique identifier for the content item"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["product", "video", "article", "course", "book"],
+      "description": "Type of content"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "Title of the content item"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 2000,
+      "description": "Detailed description of the content"
+    },
+    "imageUrls": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uri",
+        "pattern": "^https?://.*\\.(jpg|jpeg|png|gif|webp)$"
+      },
+      "maxItems": 10,
+      "uniqueItems": true,
+      "description": "Array of image URLs"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "price": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "brand": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "color": {
+          "type": "string",
+          "maxLength": 50
+        },
+        "size": {
+          "type": "string",
+          "maxLength": 50
+        },
+        "weight": {
+          "type": "number",
+          "minimum": 0
+        },
+        "dimensions": {
+          "type": "object",
+          "properties": {
+            "length": {"type": "number", "minimum": 0},
+            "width": {"type": "number", "minimum": 0},
+            "height": {"type": "number", "minimum": 0}
+          }
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 50
+          },
+          "maxItems": 20
+        }
+      },
+      "description": "Additional metadata specific to content type"
+    },
+    "categories": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9_-]+$",
+        "minLength": 1,
+        "maxLength": 50
+      },
+      "minItems": 1,
+      "maxItems": 10,
+      "uniqueItems": true,
+      "description": "Categories this content belongs to"
+    }
+  },
+  "required": ["id", "type", "title", "categories"],
+  "additionalProperties": false,
+  "examples": [
+    {
+      "id": "prod-123",
+      "type": "product",
+      "title": "Wireless Bluetooth Headphones",
+      "description": "High-quality wireless headphones with active noise cancellation",
+      "imageUrls": ["https://example.com/images/headphones.jpg"],
+      "metadata": {
+        "price": 199.99,
+        "brand": "AudioTech",
+        "color": "black",
+        "weight": 0.25,
+        "tags": ["wireless", "bluetooth", "noise-cancelling"]
+      },
+      "categories": ["electronics", "audio", "headphones"]
+    }
+  ],
+  "errorMessage": {
+    "properties": {
+      "id": "ID must be a non-empty string with only alphanumeric characters, hyphens, and underscores",
+      "type": "Type must be one of: product, video, article, course, book",
+      "title": "Title must be a non-empty string with maximum 200 characters",
+      "description": "Description must not exceed 2000 characters",
+      "imageUrls": "Image URLs must be valid HTTP/HTTPS URLs pointing to image files",
+      "categories": "Categories must be an array of 1-10 unique category names"
+    },
+    "required": {
+      "id": "ID is required",
+      "type": "Content type is required",
+      "title": "Title is required",
+      "categories": "At least one category is required"
+    }
+  }
+}

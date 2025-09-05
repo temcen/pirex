@@ -1,0 +1,284 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://api.recommendations.example.com/schemas/error-response.json",
+  "title": "Error Response",
+  "description": "Standardized error response format for all API endpoints",
+  "type": "object",
+  "properties": {
+    "error": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "VALIDATION_ERROR",
+            "INVALID_CONTENT_TYPE",
+            "MISSING_REQUIRED_FIELD",
+            "INVALID_FIELD_FORMAT",
+            "INVALID_FIELD_VALUE",
+            "FIELD_TOO_LONG",
+            "FIELD_TOO_SHORT",
+            "INVALID_URL_FORMAT",
+            "INVALID_UUID_FORMAT",
+            "INVALID_DATE_FORMAT",
+            "UNAUTHORIZED",
+            "INVALID_TOKEN",
+            "TOKEN_EXPIRED",
+            "INSUFFICIENT_PERMISSIONS",
+            "NOT_FOUND",
+            "USER_NOT_FOUND",
+            "CONTENT_NOT_FOUND",
+            "JOB_NOT_FOUND",
+            "INTERACTION_NOT_FOUND",
+            "RATE_LIMIT_EXCEEDED",
+            "QUOTA_EXCEEDED",
+            "TOO_MANY_REQUESTS",
+            "INTERNAL_SERVER_ERROR",
+            "DATABASE_CONNECTION_ERROR",
+            "DATABASE_QUERY_ERROR",
+            "CACHE_CONNECTION_ERROR",
+            "EXTERNAL_SERVICE_ERROR",
+            "EMBEDDING_GENERATION_FAILED",
+            "MODEL_LOADING_FAILED",
+            "RECOMMENDATION_GENERATION_FAILED",
+            "CONTENT_PROCESSING_FAILED",
+            "INVALID_ALGORITHM_CONFIG",
+            "SERVICE_UNAVAILABLE",
+            "MAINTENANCE_MODE",
+            "TIMEOUT_ERROR",
+            "CONCURRENT_MODIFICATION",
+            "DUPLICATE_RESOURCE",
+            "RESOURCE_CONFLICT"
+          ],
+          "description": "Machine-readable error code"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500,
+          "description": "Human-readable error message"
+        },
+        "details": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "field": {
+              "type": "string",
+              "description": "Field name that caused the error (for validation errors)"
+            },
+            "provided": {
+              "description": "Value that was provided (for validation errors)"
+            },
+            "expected": {
+              "description": "Expected value or format"
+            },
+            "allowed": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of allowed values (for enum validation errors)"
+            },
+            "userId": {
+              "type": "string",
+              "format": "uuid",
+              "description": "User ID related to the error"
+            },
+            "itemId": {
+              "type": "string",
+              "description": "Content item ID related to the error"
+            },
+            "jobId": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Job ID related to the error"
+            },
+            "algorithm": {
+              "type": "string",
+              "description": "Algorithm that failed"
+            },
+            "stage": {
+              "type": "string",
+              "description": "Processing stage where error occurred"
+            },
+            "retryAfter": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Seconds to wait before retrying (for rate limit errors)"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Rate limit that was exceeded"
+            },
+            "window": {
+              "type": "string",
+              "description": "Time window for rate limit"
+            },
+            "timeout": {
+              "type": "string",
+              "description": "Timeout duration that was exceeded"
+            },
+            "database": {
+              "type": "string",
+              "description": "Database that failed"
+            },
+            "service": {
+              "type": "string",
+              "description": "External service that failed"
+            }
+          },
+          "description": "Additional error details and context"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the error occurred (ISO 8601 format)"
+        },
+        "requestId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique request identifier for debugging and support"
+        },
+        "path": {
+          "type": "string",
+          "description": "API endpoint path where error occurred"
+        },
+        "method": {
+          "type": "string",
+          "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"],
+          "description": "HTTP method used"
+        }
+      },
+      "required": ["code", "message", "timestamp"],
+      "additionalProperties": false
+    },
+    "fallback": {
+      "type": "object",
+      "properties": {
+        "used": {
+          "type": "boolean",
+          "description": "Whether fallback data was used in response"
+        },
+        "strategy": {
+          "type": "string",
+          "enum": [
+            "cached_data",
+            "default_values",
+            "popular_recommendations",
+            "trending_items",
+            "category_based",
+            "random_selection",
+            "previous_recommendations",
+            "similar_users",
+            "content_based_only",
+            "collaborative_only"
+          ],
+          "description": "Fallback strategy that was employed"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Confidence level in the fallback data (0-1)"
+        },
+        "source": {
+          "type": "string",
+          "description": "Source of the fallback data"
+        },
+        "age": {
+          "type": "string",
+          "description": "Age of the fallback data (e.g., '2h', '1d')"
+        }
+      },
+      "required": ["used"],
+      "additionalProperties": false,
+      "description": "Information about fallback data used when primary operation failed"
+    }
+  },
+  "required": ["error"],
+  "additionalProperties": false,
+  "examples": [
+    {
+      "error": {
+        "code": "INVALID_CONTENT_TYPE",
+        "message": "Content type must be one of: product, video, article, course, book",
+        "details": {
+          "field": "type",
+          "provided": "invalid_type",
+          "allowed": ["product", "video", "article", "course", "book"]
+        },
+        "timestamp": "2024-01-15T10:30:00Z",
+        "requestId": "550e8400-e29b-41d4-a716-446655440000",
+        "path": "/api/v1/content",
+        "method": "POST"
+      }
+    },
+    {
+      "error": {
+        "code": "USER_NOT_FOUND",
+        "message": "User with ID 'user-123' not found",
+        "details": {
+          "userId": "550e8400-e29b-41d4-a716-446655440000"
+        },
+        "timestamp": "2024-01-15T10:30:00Z",
+        "requestId": "550e8400-e29b-41d4-a716-446655440001",
+        "path": "/api/v1/recommendations/user-123",
+        "method": "GET"
+      },
+      "fallback": {
+        "used": true,
+        "strategy": "popular_recommendations",
+        "confidence": 0.3,
+        "source": "trending_cache",
+        "age": "1h"
+      }
+    },
+    {
+      "error": {
+        "code": "RATE_LIMIT_EXCEEDED",
+        "message": "Rate limit of 1000 requests per hour exceeded",
+        "details": {
+          "limit": 1000,
+          "window": "1h",
+          "retryAfter": 3600
+        },
+        "timestamp": "2024-01-15T10:30:00Z",
+        "requestId": "550e8400-e29b-41d4-a716-446655440002",
+        "path": "/api/v1/recommendations/user-456",
+        "method": "GET"
+      }
+    },
+    {
+      "error": {
+        "code": "EMBEDDING_GENERATION_FAILED",
+        "message": "Failed to generate embeddings for content",
+        "details": {
+          "itemId": "prod-123",
+          "stage": "text_embedding",
+          "algorithm": "sentence-bert"
+        },
+        "timestamp": "2024-01-15T10:30:00Z",
+        "requestId": "550e8400-e29b-41d4-a716-446655440003",
+        "path": "/api/v1/content",
+        "method": "POST"
+      },
+      "fallback": {
+        "used": true,
+        "strategy": "cached_embeddings",
+        "confidence": 0.8,
+        "source": "embedding_cache",
+        "age": "2d"
+      }
+    }
+  ],
+  "errorMessage": {
+    "properties": {
+      "error": "Error object is required and must contain code, message, and timestamp",
+      "fallback": "Fallback object must specify whether fallback was used"
+    },
+    "required": {
+      "error": "Error information is required"
+    }
+  }
+}

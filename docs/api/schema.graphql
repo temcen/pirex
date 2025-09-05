@@ -1,0 +1,517 @@
+# GraphQL Schema for Recommendation Engine API
+# This schema defines all types, queries, mutations, and subscriptions
+# for the recommendation engine GraphQL API
+
+# Scalar types for custom data formats
+scalar DateTime
+scalar JSON
+scalar UUID
+
+# Enums for controlled vocabularies
+enum ContentType {
+  PRODUCT
+  VIDEO
+  ARTICLE
+  COURSE
+  BOOK
+}
+
+enum InteractionType {
+  RATING
+  LIKE
+  DISLIKE
+  SHARE
+  CLICK
+  VIEW
+  SEARCH
+  BROWSE
+}
+
+enum RecommendationAlgorithm {
+  SEMANTIC_SEARCH
+  COLLABORATIVE_FILTERING
+  PAGERANK
+  POPULARITY
+  HYBRID
+}
+
+enum ExplanationType {
+  CONTENT_BASED
+  COLLABORATIVE
+  GRAPH_BASED
+  POPULARITY_BASED
+}
+
+enum FeedbackType {
+  HELPFUL
+  NOT_HELPFUL
+  IRRELEVANT
+  OFFENSIVE
+}
+
+enum JobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum RecommendationContext {
+  HOME
+  SEARCH
+  PRODUCT_PAGE
+  CATEGORY
+  CHECKOUT
+}
+
+# Core domain types
+type User {
+  id: UUID!
+  profile: UserProfile
+  interactions(
+    limit: Int = 100
+    offset: Int = 0
+    type: InteractionType
+    from: DateTime
+    to: DateTime
+  ): UserInteractionConnection!
+  recommendations(
+    count: Int = 10
+    context: RecommendationContext = HOME
+    categories: [String!]
+    exclude: [String!]
+  ): RecommendationResponse!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type UserProfile {
+  userId: UUID!
+  preferenceVector: [Float!]
+  explicitPreferences: ExplicitPreferences
+  behaviorPatterns: BehaviorPatterns
+  demographics: Demographics
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type ExplicitPreferences {
+  categories: [String!]
+  brands: [String!]
+  priceRange: PriceRange
+}
+
+type PriceRange {
+  min: Float
+  max: Float
+}
+
+type BehaviorPatterns {
+  avgSessionDuration: Float
+  preferredTimeOfDay: String
+  devicePreference: String
+  interactionFrequency: String
+}
+
+type Demographics {
+  ageGroup: String
+  location: String
+  interests: [String!]
+}
+
+type Content {
+  id: String!
+  type: ContentType!
+  title: String!
+  description: String
+  imageUrls: [String!]
+  metadata: JSON
+  categories: [String!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  
+  # Computed fields
+  averageRating: Float
+  totalInteractions: Int
+  similarContent(limit: Int = 10): [Content!]!
+}
+
+type UserInteraction {
+  id: UUID!
+  userId: UUID!
+  itemId: String!
+  interactionType: InteractionType!
+  value: Float
+  timestamp: DateTime!
+  sessionId: UUID
+  context: JSON
+  
+  # Related entities
+  user: User!
+  content: Content!
+}
+
+type Recommendation {
+  itemId: String!
+  score: Float!
+  algorithm: RecommendationAlgorithm!
+  explanation: Explanation
+  confidence: Float!
+  position: Int!
+  metadata: JSON
+  
+  # Related entities
+  content: Content!
+}
+
+type Explanation {
+  type: ExplanationType!
+  message: String!
+  evidence: ExplanationEvidence
+  details: JSON
+}
+
+type ExplanationEvidence {
+  similarItems: [String!]
+  sharedUsers: Int
+  categories: [String!]
+  confidence: Float
+}
+
+type RecommendationResponse {
+  userId: UUID!
+  recommendations: [Recommendation!]!
+  metadata: RecommendationMetadata!
+  pagination: Pagination
+}
+
+type RecommendationMetadata {
+  totalAvailable: Int!
+  algorithmsUsed: [RecommendationAlgorithm!]!
+  generatedAt: DateTime!
+  cacheHit: Boolean!
+  processingTime: Float
+}
+
+type ContentIngestionJob {
+  id: UUID!
+  status: JobStatus!
+  progress: Float
+  startedAt: DateTime
+  completedAt: DateTime
+  error: String
+  results: JobResults
+  
+  # Input data
+  contentItem: Content
+}
+
+type JobResults {
+  embeddingsGenerated: Boolean!
+  metadataStored: Boolean!
+  indexUpdated: Boolean!
+}
+
+# Connection types for pagination
+type UserInteractionConnection {
+  edges: [UserInteractionEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type UserInteractionEdge {
+  node: UserInteraction!
+  cursor: String!
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+type Pagination {
+  limit: Int!
+  offset: Int!
+  total: Int!
+  hasMore: Boolean!
+}
+
+# Input types for mutations
+input ContentItemInput {
+  id: String!
+  type: ContentType!
+  title: String!
+  description: String
+  imageUrls: [String!]
+  metadata: JSON
+  categories: [String!]!
+}
+
+input UserInteractionInput {
+  userId: UUID!
+  itemId: String!
+  interactionType: InteractionType!
+  value: Float
+  timestamp: DateTime
+  sessionId: UUID
+  context: JSON
+}
+
+input UserProfileInput {
+  explicitPreferences: ExplicitPreferencesInput
+  demographics: DemographicsInput
+}
+
+input ExplicitPreferencesInput {
+  categories: [String!]
+  brands: [String!]
+  priceRange: PriceRangeInput
+}
+
+input PriceRangeInput {
+  min: Float
+  max: Float
+}
+
+input DemographicsInput {
+  ageGroup: String
+  location: String
+  interests: [String!]
+}
+
+input RecommendationFilters {
+  categories: [String!]
+  exclude: [String!]
+  minScore: Float
+  algorithms: [RecommendationAlgorithm!]
+}
+
+input PaginationInput {
+  limit: Int = 20
+  offset: Int = 0
+}
+
+input FeedbackInput {
+  userId: UUID!
+  recommendationId: UUID!
+  itemId: String!
+  feedbackType: FeedbackType!
+  rating: Float
+  comment: String
+}
+
+# Response types for mutations
+type ContentIngestionResponse {
+  jobId: UUID!
+  status: JobStatus!
+  estimatedTime: String
+  message: String!
+}
+
+type InteractionResponse {
+  interactionId: UUID!
+  status: String!
+  message: String!
+}
+
+type FeedbackResponse {
+  feedbackId: UUID!
+  status: String!
+  message: String!
+}
+
+type BatchResponse {
+  batchId: UUID!
+  totalProcessed: Int!
+  successful: Int!
+  failed: Int!
+  errors: [BatchError!]
+}
+
+type BatchError {
+  index: Int!
+  error: String!
+  input: JSON
+}
+
+# Root Query type
+type Query {
+  # User queries
+  user(id: UUID!): User
+  users(
+    limit: Int = 20
+    offset: Int = 0
+    search: String
+  ): [User!]!
+  
+  # Content queries
+  content(id: String!): Content
+  contents(
+    limit: Int = 20
+    offset: Int = 0
+    type: ContentType
+    categories: [String!]
+    search: String
+  ): [Content!]!
+  
+  # Recommendation queries
+  recommendations(
+    userId: UUID!
+    count: Int = 10
+    context: RecommendationContext = HOME
+    filters: RecommendationFilters
+  ): RecommendationResponse!
+  
+  similarRecommendations(
+    userId: UUID!
+    itemId: String!
+    count: Int = 10
+  ): RecommendationResponse!
+  
+  # Interaction queries
+  interactions(
+    userId: UUID
+    itemId: String
+    type: InteractionType
+    from: DateTime
+    to: DateTime
+    pagination: PaginationInput
+  ): UserInteractionConnection!
+  
+  # Job status queries
+  contentJob(id: UUID!): ContentIngestionJob
+  contentJobs(
+    status: JobStatus
+    limit: Int = 20
+    offset: Int = 0
+  ): [ContentIngestionJob!]!
+  
+  # Analytics queries
+  userProfile(userId: UUID!): UserProfile
+  contentAnalytics(itemId: String!): ContentAnalytics
+  systemHealth: SystemHealth!
+}
+
+# Root Mutation type
+type Mutation {
+  # Content management mutations
+  ingestContent(input: ContentItemInput!): ContentIngestionResponse!
+  
+  ingestContentBatch(items: [ContentItemInput!]!): BatchResponse!
+  
+  updateContent(
+    id: String!
+    input: ContentItemInput!
+  ): Content!
+  
+  deleteContent(id: String!): Boolean!
+  
+  # User interaction mutations
+  addInteraction(input: UserInteractionInput!): InteractionResponse!
+  
+  addInteractionsBatch(
+    interactions: [UserInteractionInput!]!
+  ): BatchResponse!
+  
+  # User profile mutations
+  updateUserProfile(
+    userId: UUID!
+    input: UserProfileInput!
+  ): UserProfile!
+  
+  # Content rating mutations
+  rateContent(
+    userId: UUID!
+    itemId: String!
+    rating: Float!
+    comment: String
+  ): InteractionResponse!
+  
+  # Feedback mutations
+  recordFeedback(input: FeedbackInput!): FeedbackResponse!
+  
+  # System mutations
+  refreshRecommendations(userId: UUID!): Boolean!
+  
+  clearUserCache(userId: UUID!): Boolean!
+  
+  reprocessContent(itemId: String!): ContentIngestionResponse!
+}
+
+# Root Subscription type for real-time updates
+type Subscription {
+  # Real-time recommendation updates
+  recommendationUpdates(userId: UUID!): RecommendationResponse!
+  
+  # Content processing updates
+  contentJobUpdates(jobId: UUID!): ContentIngestionJob!
+  
+  # User interaction updates
+  userInteractionUpdates(userId: UUID!): UserInteraction!
+  
+  # System health updates
+  systemHealthUpdates: SystemHealth!
+}
+
+# Additional types for analytics and system health
+type ContentAnalytics {
+  itemId: String!
+  totalViews: Int!
+  totalRatings: Int!
+  averageRating: Float!
+  totalShares: Int!
+  conversionRate: Float!
+  popularityScore: Float!
+  trendingScore: Float!
+  categoryRank: Int
+  lastUpdated: DateTime!
+}
+
+type SystemHealth {
+  status: String!
+  timestamp: DateTime!
+  services: [ServiceHealth!]!
+  metrics: SystemMetrics!
+}
+
+type ServiceHealth {
+  name: String!
+  status: String!
+  responseTime: Float
+  errorRate: Float
+  lastCheck: DateTime!
+}
+
+type SystemMetrics {
+  totalUsers: Int!
+  totalContent: Int!
+  totalInteractions: Int!
+  recommendationsServed: Int!
+  averageResponseTime: Float!
+  cacheHitRate: Float!
+  systemLoad: Float!
+}
+
+# Schema directives for additional metadata
+directive @auth(requires: String = "USER") on FIELD_DEFINITION
+directive @rateLimit(max: Int!, window: String!) on FIELD_DEFINITION
+directive @cache(ttl: Int!) on FIELD_DEFINITION
+directive @deprecated(reason: String) on FIELD_DEFINITION | ENUM_VALUE
+
+# Apply directives to sensitive operations
+extend type Query {
+  recommendations: RecommendationResponse! @auth(requires: "USER") @rateLimit(max: 100, window: "1h")
+  userProfile: UserProfile @auth(requires: "USER") @cache(ttl: 300)
+}
+
+extend type Mutation {
+  ingestContent: ContentIngestionResponse! @auth(requires: "ADMIN") @rateLimit(max: 1000, window: "1h")
+  addInteraction: InteractionResponse! @auth(requires: "USER") @rateLimit(max: 10000, window: "1h")
+  updateUserProfile: UserProfile! @auth(requires: "USER") @rateLimit(max: 10, window: "1h")
+}
+
+extend type Subscription {
+  recommendationUpdates: RecommendationResponse! @auth(requires: "USER")
+}

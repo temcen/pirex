@@ -1,0 +1,355 @@
+# Real-Time Learning Configuration
+
+feedback_processing:
+  # Number of workers for processing explicit feedback (ratings, likes)
+  explicit_workers: 10
+  
+  # Number of workers for processing implicit feedback (clicks, views)
+  implicit_workers: 5
+  
+  # Batch size for implicit feedback processing
+  batch_size: 100
+  
+  # Interval for processing batched implicit feedback
+  batch_interval: "5m"
+  
+  # Rate limiting configuration
+  rate_limiting:
+    # Default rate limit per user per minute
+    default_limit: 100
+    
+    # Rate limit window
+    window: "1m"
+    
+    # Rate limits by feedback type
+    limits:
+      rating: 20      # Max 20 ratings per minute
+      like: 50        # Max 50 likes per minute
+      click: 200      # Max 200 clicks per minute
+      view: 500       # Max 500 views per minute
+  
+  # Spam detection configuration
+  spam_detection:
+    # Maximum duplicate content occurrences per hour
+    max_duplicate_content: 5
+    
+    # Maximum feedback events per minute (rapid feedback detection)
+    max_rapid_feedback: 10
+    
+    # Minimum user reliability score (0-100)
+    min_reliability_score: 20
+
+algorithm_optimization:
+  # How often to update algorithm weights
+  update_interval: "1h"
+  
+  # Performance evaluation window
+  performance_window: "7d"
+  
+  # Minimum CTR threshold for algorithm performance
+  min_performance_threshold: 0.005  # 0.5%
+  
+  # Thompson Sampling configuration
+  thompson_sampling:
+    # Prior parameters for Beta distribution
+    alpha_prior: 1.0
+    beta_prior: 1.0
+    
+    # Minimum sample size before optimization
+    min_sample_size: 100
+  
+  # User segment thresholds
+  user_segments:
+    new_user:
+      max_interactions: 5
+      algorithm_weights:
+        semantic_search: 0.2
+        collaborative_filtering: 0.1
+        pagerank: 0.2
+        popularity_based: 0.5
+    
+    power_user:
+      min_interactions: 100
+      algorithm_weights:
+        semantic_search: 0.3
+        collaborative_filtering: 0.4
+        pagerank: 0.3
+        popularity_based: 0.0
+    
+    inactive_user:
+      days_since_last_interaction: 30
+      algorithm_weights:
+        semantic_search: 0.3
+        collaborative_filtering: 0.2
+        pagerank: 0.2
+        popularity_based: 0.3
+    
+    regular_user:
+      algorithm_weights:
+        semantic_search: 0.4
+        collaborative_filtering: 0.3
+        pagerank: 0.3
+        popularity_based: 0.0
+
+ab_testing:
+  # Default experiment configuration
+  defaults:
+    # Minimum sample size for statistical significance
+    min_sample_size: 1000
+    
+    # Statistical power (1 - β)
+    target_power: 0.8
+    
+    # Significance level (α)
+    significance_level: 0.05
+    
+    # Maximum experiment duration
+    max_duration: "30d"
+  
+  # Experiment types and their configurations
+  experiment_types:
+    algorithm:
+      # Metrics to track for algorithm experiments
+      success_metrics:
+        - "ctr"
+        - "conversion_rate"
+        - "user_satisfaction"
+      
+      # Minimum effect size to detect
+      min_effect_size: 0.05  # 5% relative improvement
+    
+    ui:
+      success_metrics:
+        - "ctr"
+        - "engagement_time"
+        - "bounce_rate"
+      
+      min_effect_size: 0.03  # 3% relative improvement
+    
+    ranking:
+      success_metrics:
+        - "ctr"
+        - "conversion_rate"
+        - "revenue_per_user"
+      
+      min_effect_size: 0.02  # 2% relative improvement
+
+continuous_learning:
+  # How often to retrain models
+  retraining_interval: "7d"  # Weekly retraining
+  
+  # Minimum training data required for retraining
+  min_training_data: 10000
+  
+  # Validation split for model evaluation
+  validation_split: 0.2  # 20% for validation
+  
+  # Exploration vs exploitation configuration
+  exploration:
+    # Base exploration rate (ε-greedy)
+    base_rate: 0.1  # 10% exploration
+    
+    # Exploration rates by user segment
+    segment_rates:
+      new_user: 0.3      # 30% exploration for new users
+      power_user: 0.05   # 5% exploration for power users
+      inactive_user: 0.2 # 20% exploration for inactive users
+      regular_user: 0.1  # 10% exploration for regular users
+  
+  # Feature engineering configuration
+  feature_engineering:
+    # User features to extract
+    user_features:
+      - "interaction_count"
+      - "avg_rating"
+      - "days_since_last_interaction"
+      - "preference_vector_magnitude"
+      - "is_new_user"
+      - "is_power_user"
+    
+    # Item features to extract
+    item_features:
+      - "avg_rating"
+      - "rating_count"
+      - "days_since_created"
+      - "category_count"
+      - "embedding_magnitude"
+      - "is_new_item"
+      - "is_popular_item"
+    
+    # Context features to extract
+    context_features:
+      - "hour_of_day"
+      - "day_of_week"
+      - "is_weekend"
+      - "is_evening"
+      - "session_length_minutes"
+      - "session_interaction_count"
+    
+    # Interaction features to extract
+    interaction_features:
+      - "is_explicit_feedback"
+      - "is_implicit_feedback"
+      - "interaction_value"
+      - "recommendation_position"
+      - "is_top_recommendation"
+      - "from_semantic_search"
+      - "from_collaborative_filtering"
+      - "from_pagerank"
+  
+  # Model performance monitoring
+  performance_monitoring:
+    # How often to check model performance
+    check_interval: "30m"
+    
+    # Performance degradation thresholds
+    degradation_thresholds:
+      ctr_drop: 0.1        # 10% CTR drop triggers alert
+      conversion_drop: 0.15 # 15% conversion drop triggers alert
+      latency_increase: 2.0 # 2x latency increase triggers alert
+    
+    # Automatic rollback configuration
+    auto_rollback:
+      enabled: true
+      
+      # Conditions that trigger automatic rollback
+      conditions:
+        - metric: "ctr"
+          threshold: 0.2    # 20% drop
+          duration: "1h"    # Sustained for 1 hour
+        
+        - metric: "error_rate"
+          threshold: 0.05   # 5% error rate
+          duration: "15m"   # Sustained for 15 minutes
+
+# Monitoring and alerting configuration
+monitoring:
+  # Metrics collection interval
+  collection_interval: "5m"
+  
+  # Metrics to track
+  metrics:
+    feedback_processing:
+      - "processed_count"
+      - "error_count"
+      - "avg_processing_time"
+      - "queue_sizes"
+    
+    algorithm_optimization:
+      - "algorithm_weights"
+      - "performance_metrics"
+      - "optimization_frequency"
+    
+    ab_testing:
+      - "active_experiments"
+      - "experiment_results"
+      - "statistical_significance"
+    
+    continuous_learning:
+      - "model_performance"
+      - "retraining_frequency"
+      - "feature_importance"
+  
+  # Alerting thresholds
+  alerts:
+    feedback_processing:
+      high_error_rate:
+        threshold: 0.05  # 5% error rate
+        duration: "10m"
+        severity: "warning"
+      
+      queue_backup:
+        threshold: 1000  # Queue size
+        duration: "5m"
+        severity: "critical"
+    
+    algorithm_optimization:
+      performance_degradation:
+        threshold: 0.1   # 10% performance drop
+        duration: "1h"
+        severity: "warning"
+    
+    continuous_learning:
+      model_degradation:
+        threshold: 0.15  # 15% performance drop
+        duration: "30m"
+        severity: "critical"
+      
+      retraining_failure:
+        threshold: 1     # Any failure
+        duration: "0s"
+        severity: "critical"
+
+# Cache configuration for real-time learning
+caching:
+  # User preference vectors
+  user_preferences:
+    ttl: "1h"
+    max_size: 100000
+  
+  # Algorithm weights
+  algorithm_weights:
+    ttl: "24h"
+    max_size: 1000
+  
+  # Experiment assignments
+  experiment_assignments:
+    ttl: "24h"
+    max_size: 1000000
+  
+  # Model predictions
+  model_predictions:
+    ttl: "15m"
+    max_size: 50000
+  
+  # Feature vectors
+  feature_vectors:
+    ttl: "6h"
+    max_size: 200000
+
+# Database configuration for real-time learning
+database:
+  # Connection pool settings
+  connection_pool:
+    max_connections: 50
+    idle_connections: 10
+    connection_lifetime: "1h"
+  
+  # Batch processing settings
+  batch_processing:
+    batch_size: 1000
+    batch_timeout: "30s"
+    max_retries: 3
+  
+  # Data retention policies
+  retention:
+    feedback_events: "90d"      # Keep feedback events for 90 days
+    experiment_data: "1y"       # Keep experiment data for 1 year
+    model_versions: "6m"        # Keep model versions for 6 months
+    performance_metrics: "1y"   # Keep performance metrics for 1 year
+
+# Security configuration
+security:
+  # Rate limiting for API endpoints
+  api_rate_limiting:
+    feedback_submission: "1000/h"    # 1000 requests per hour
+    metrics_access: "100/h"          # 100 requests per hour
+    experiment_management: "50/h"    # 50 requests per hour
+  
+  # Input validation
+  input_validation:
+    max_feedback_value: 10.0
+    max_context_size: 1024      # bytes
+    allowed_feedback_types: ["explicit", "implicit"]
+    allowed_actions: ["rating", "like", "dislike", "click", "view", "purchase"]
+  
+  # Data privacy
+  privacy:
+    # Anonymize user data after this period
+    anonymization_period: "2y"
+    
+    # PII fields to exclude from logs
+    exclude_from_logs:
+      - "user_email"
+      - "user_phone"
+      - "user_address"

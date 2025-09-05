@@ -1,0 +1,186 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://api.recommendations.example.com/schemas/recommendation.json",
+  "title": "Recommendation",
+  "description": "Schema for recommendation response data",
+  "type": "object",
+  "properties": {
+    "itemId": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]+$",
+      "minLength": 1,
+      "maxLength": 100,
+      "description": "ID of the recommended content item"
+    },
+    "score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Recommendation score (0-1)"
+    },
+    "algorithm": {
+      "type": "string",
+      "enum": ["semantic_search", "collaborative_filtering", "pagerank", "popularity", "hybrid"],
+      "description": "Algorithm used to generate this recommendation"
+    },
+    "explanation": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["content_based", "collaborative", "graph_based", "popularity_based"],
+          "description": "Type of explanation"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500,
+          "description": "Human-readable explanation"
+        },
+        "evidence": {
+          "type": "object",
+          "properties": {
+            "similarItems": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]+$"
+              },
+              "maxItems": 10,
+              "description": "Items that contributed to this recommendation"
+            },
+            "sharedUsers": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000,
+              "description": "Number of users with similar preferences"
+            },
+            "categories": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 50
+              },
+              "maxItems": 10,
+              "description": "Shared categories"
+            },
+            "confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Confidence in the evidence"
+            }
+          },
+          "additionalProperties": false
+        },
+        "details": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Additional explanation details"
+        }
+      },
+      "required": ["type", "message"],
+      "additionalProperties": false
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Confidence score for this recommendation"
+    },
+    "position": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000,
+      "description": "Position in the recommendation list"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "generatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When this recommendation was generated"
+        },
+        "cacheHit": {
+          "type": "boolean",
+          "description": "Whether this recommendation came from cache"
+        },
+        "processingTime": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Processing time in milliseconds"
+        },
+        "fallbackUsed": {
+          "type": "boolean",
+          "description": "Whether fallback algorithm was used"
+        },
+        "diversityScore": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Diversity contribution score"
+        }
+      },
+      "description": "Additional metadata about the recommendation"
+    }
+  },
+  "required": ["itemId", "score", "algorithm", "confidence", "position"],
+  "additionalProperties": false,
+  "examples": [
+    {
+      "itemId": "prod-789",
+      "score": 0.85,
+      "algorithm": "hybrid",
+      "explanation": {
+        "type": "content_based",
+        "message": "Because you liked 'Wireless Mouse' and both are in electronics category",
+        "evidence": {
+          "similarItems": ["prod-123", "prod-456"],
+          "categories": ["electronics", "accessories"],
+          "confidence": 0.8
+        }
+      },
+      "confidence": 0.82,
+      "position": 1,
+      "metadata": {
+        "generatedAt": "2024-01-15T10:30:00Z",
+        "cacheHit": false,
+        "processingTime": 45.2,
+        "diversityScore": 0.3
+      }
+    },
+    {
+      "itemId": "prod-101",
+      "score": 0.72,
+      "algorithm": "collaborative_filtering",
+      "explanation": {
+        "type": "collaborative",
+        "message": "Users who liked similar items also rated this 4.2/5",
+        "evidence": {
+          "sharedUsers": 156,
+          "confidence": 0.75
+        }
+      },
+      "confidence": 0.74,
+      "position": 2
+    }
+  ],
+  "errorMessage": {
+    "properties": {
+      "itemId": "Item ID must be a non-empty string with only alphanumeric characters, hyphens, and underscores",
+      "score": "Score must be a number between 0 and 1",
+      "algorithm": "Algorithm must be one of: semantic_search, collaborative_filtering, pagerank, popularity, hybrid",
+      "confidence": "Confidence must be a number between 0 and 1",
+      "position": "Position must be a positive integer"
+    },
+    "required": {
+      "itemId": "Item ID is required",
+      "score": "Score is required",
+      "algorithm": "Algorithm is required",
+      "confidence": "Confidence is required",
+      "position": "Position is required"
+    }
+  }
+}

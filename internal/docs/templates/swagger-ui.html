@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Config.Title}} - API Documentation</title>
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@4.15.5/swagger-ui.css" />
+    <style>
+        html {
+            box-sizing: border-box;
+            overflow: -moz-scrollbars-vertical;
+            overflow-y: scroll;
+        }
+        *, *:before, *:after {
+            box-sizing: inherit;
+        }
+        body {
+            margin:0;
+            background: #fafafa;
+        }
+        .swagger-ui .topbar {
+            background-color: #2c3e50;
+        }
+        .swagger-ui .topbar .download-url-wrapper {
+            display: none;
+        }
+        .custom-nav {
+            background-color: #34495e;
+            padding: 1rem;
+            margin-bottom: 2rem;
+        }
+        .custom-nav ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            gap: 2rem;
+        }
+        .custom-nav a {
+            color: #ecf0f1;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        .custom-nav a:hover {
+            background-color: #2c3e50;
+        }
+        .api-info {
+            background: white;
+            padding: 2rem;
+            margin: 2rem 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .api-info h1 {
+            color: #2c3e50;
+            margin-top: 0;
+        }
+        .api-info p {
+            color: #7f8c8d;
+            line-height: 1.6;
+        }
+        .quick-links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+        .quick-link {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-decoration: none;
+            color: #2c3e50;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .quick-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            text-decoration: none;
+            color: #2c3e50;
+        }
+        .quick-link h3 {
+            margin-top: 0;
+            color: #3498db;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="custom-nav">
+        <div class="container">
+            <ul>
+                <li><a href="{{.BaseURL}}/">API Reference</a></li>
+                <li><a href="{{.BaseURL}}/schemas">Schemas</a></li>
+                <li><a href="{{.BaseURL}}/examples">Examples</a></li>
+                <li><a href="{{.BaseURL}}/authentication">Authentication</a></li>
+                <li><a href="{{.BaseURL}}/rate-limiting">Rate Limiting</a></li>
+                <li><a href="{{.BaseURL}}/errors">Error Handling</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="api-info">
+            <h1>{{.Config.Title}}</h1>
+            <p>{{.Config.Description}}</p>
+            <p><strong>Version:</strong> {{.Config.Version}} | <strong>Base URL:</strong> {{.Config.Host}}{{.Config.BasePath}}</p>
+        </div>
+
+        <div class="quick-links">
+            <a href="#/Content%20Management" class="quick-link">
+                <h3>Content Management</h3>
+                <p>Ingest and manage content items for recommendations</p>
+            </a>
+            <a href="#/User%20Interactions" class="quick-link">
+                <h3>User Interactions</h3>
+                <p>Track user behavior and interactions with content</p>
+            </a>
+            <a href="#/Recommendations" class="quick-link">
+                <h3>Recommendations</h3>
+                <p>Generate personalized content recommendations</p>
+            </a>
+            <a href="#/Feedback" class="quick-link">
+                <h3>Feedback</h3>
+                <p>Collect and process user feedback on recommendations</p>
+            </a>
+        </div>
+    </div>
+
+    <div id="swagger-ui"></div>
+
+    <script src="https://unpkg.com/swagger-ui-dist@4.15.5/swagger-ui-bundle.js"></script>
+    <script src="https://unpkg.com/swagger-ui-dist@4.15.5/swagger-ui-standalone-preset.js"></script>
+    <script>
+        window.onload = function() {
+            const ui = SwaggerUIBundle({
+                url: '{{.SpecURL}}',
+                dom_id: '#swagger-ui',
+                deepLinking: true,
+                presets: [
+                    SwaggerUIBundle.presets.apis,
+                    SwaggerUIStandalonePreset
+                ],
+                plugins: [
+                    SwaggerUIBundle.plugins.DownloadUrl
+                ],
+                layout: "StandaloneLayout",
+                validatorUrl: null,
+                tryItOutEnabled: true,
+                supportedSubmitMethods: ['get', 'post', 'put', 'delete', 'patch'],
+                onComplete: function() {
+                    console.log('Swagger UI loaded successfully');
+                },
+                requestInterceptor: function(request) {
+                    // Add any default headers or authentication
+                    if (!request.headers['Content-Type'] && request.method !== 'GET') {
+                        request.headers['Content-Type'] = 'application/json';
+                    }
+                    return request;
+                },
+                responseInterceptor: function(response) {
+                    // Log responses for debugging
+                    console.log('API Response:', response);
+                    return response;
+                }
+            });
+
+            window.ui = ui;
+        };
+    </script>
+</body>
+</html>

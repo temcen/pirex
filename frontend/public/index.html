@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recommendation Engine Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="css/dashboard.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="bi bi-graph-up"></i>
+                Recommendation Engine
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#dashboard">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#recommendations">Recommendations</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#profile">Profile</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="admin.html">Admin</a>
+                    </li>
+                </ul>
+                <div class="navbar-nav">
+                    <div class="nav-item">
+                        <span class="navbar-text">
+                            <i class="bi bi-circle-fill text-success" id="connection-status"></i>
+                            <span id="connection-text">Connected</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container-fluid mt-4">
+        <!-- Dashboard Section -->
+        <div id="dashboard" class="content-section">
+            <div class="row">
+                <!-- Key Metrics Cards -->
+                <div class="col-md-3 mb-4">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h6 class="card-title">Total Recommendations</h6>
+                                    <h3 id="total-recommendations">-</h3>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="bi bi-graph-up fs-1"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-3 mb-4">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h6 class="card-title">Click-Through Rate</h6>
+                                    <h3 id="ctr-rate">-</h3>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="bi bi-cursor-fill fs-1"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-3 mb-4">
+                    <div class="card bg-info text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h6 class="card-title">Conversion Rate</h6>
+                                    <h3 id="conversion-rate">-</h3>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="bi bi-check-circle-fill fs-1"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-3 mb-4">
+                    <div class="card bg-warning text-dark">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h6 class="card-title">Active Users</h6>
+                                    <h3 id="active-users">-</h3>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="bi bi-people-fill fs-1"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="row">
+                <div class="col-md-8 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Performance Trends</h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="performance-chart" height="100"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Algorithm Performance</h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="algorithm-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Health -->
+            <div class="row">
+                <div class="col-12 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">System Health</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row" id="health-status">
+                                <!-- Health status will be populated by JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recommendations Section -->
+        <div id="recommendations" class="content-section" style="display: none;">
+            <div class="row">
+                <div class="col-12 mb-4">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="card-title mb-0">Your Recommendations</h5>
+                            <div>
+                                <button class="btn btn-outline-primary btn-sm" id="refresh-recommendations">
+                                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm" id="filter-toggle">
+                                    <i class="bi bi-funnel"></i> Filters
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <!-- Filters (initially hidden) -->
+                            <div id="filters-panel" class="mb-3" style="display: none;">
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <select class="form-select" id="category-filter">
+                                            <option value="">All Categories</option>
+                                            <option value="electronics">Electronics</option>
+                                            <option value="books">Books</option>
+                                            <option value="clothing">Clothing</option>
+                                            <option value="home">Home & Garden</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <select class="form-select" id="sort-filter">
+                                            <option value="relevance">Sort by Relevance</option>
+                                            <option value="rating">Sort by Rating</option>
+                                            <option value="price">Sort by Price</option>
+                                            <option value="popularity">Sort by Popularity</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <input type="text" class="form-control" id="search-input" placeholder="Search recommendations...">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <button class="btn btn-primary" id="apply-filters">Apply Filters</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Recommendations Grid -->
+                            <div id="recommendations-grid" class="row">
+                                <!-- Recommendations will be populated by JavaScript -->
+                            </div>
+                            
+                            <!-- Load More Button -->
+                            <div class="text-center mt-4">
+                                <button class="btn btn-outline-primary" id="load-more-recommendations">
+                                    Load More Recommendations
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Section -->
+        <div id="profile" class="content-section" style="display: none;">
+            <div class="row">
+                <div class="col-md-8 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Preference Settings</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="preferences-form">
+                                <div class="mb-3">
+                                    <label class="form-label">Preferred Categories</label>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="pref-electronics" value="electronics">
+                                                <label class="form-check-label" for="pref-electronics">Electronics</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="pref-books" value="books">
+                                                <label class="form-check-label" for="pref-books">Books</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="pref-clothing" value="clothing">
+                                                <label class="form-check-label" for="pref-clothing">Clothing</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="pref-home" value="home">
+                                                <label class="form-check-label" for="pref-home">Home & Garden</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="pref-sports" value="sports">
+                                                <label class="form-check-label" for="pref-sports">Sports</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="pref-health" value="health">
+                                                <label class="form-check-label" for="pref-health">Health & Beauty</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="diversity-slider" class="form-label">Recommendation Diversity</label>
+                                    <input type="range" class="form-range" id="diversity-slider" min="0" max="100" value="30">
+                                    <div class="d-flex justify-content-between">
+                                        <small>Similar Items</small>
+                                        <small>Diverse Items</small>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="serendipity-slider" class="form-label">Serendipity Level</label>
+                                    <input type="range" class="form-range" id="serendipity-slider" min="0" max="100" value="15">
+                                    <div class="d-flex justify-content-between">
+                                        <small>Predictable</small>
+                                        <small>Surprising</small>
+                                    </div>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-primary">Save Preferences</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Your Activity</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <h6>Recent Interactions</h6>
+                                <div id="recent-interactions">
+                                    <!-- Recent interactions will be populated by JavaScript -->
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h6>Recommendation History</h6>
+                                <button class="btn btn-outline-secondary btn-sm" id="view-history">
+                                    View Full History
+                                </button>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h6>Privacy Settings</h6>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="track-interactions" checked>
+                                    <label class="form-check-label" for="track-interactions">
+                                        Track my interactions
+                                    </label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="personalized-recommendations" checked>
+                                    <label class="form-check-label" for="personalized-recommendations">
+                                        Personalized recommendations
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container for Notifications -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div id="notification-toast" class="toast" role="alert">
+            <div class="toast-header">
+                <i class="bi bi-bell-fill me-2"></i>
+                <strong class="me-auto">Notification</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body" id="toast-message">
+                <!-- Toast message will be set by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/dashboard.js"></script>
+</body>
+</html>

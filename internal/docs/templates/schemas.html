@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Config.Title}} - JSON Schemas</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            background-color: #f8f9fa;
+        }
+        .header {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+        .header h1 {
+            color: #2c3e50;
+            margin-top: 0;
+        }
+        .nav {
+            background: #34495e;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+        }
+        .nav ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        .nav a {
+            color: #ecf0f1;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        .nav a:hover {
+            background-color: #2c3e50;
+        }
+        .schema-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+        }
+        .schema-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .schema-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        .schema-header {
+            background: #3498db;
+            color: white;
+            padding: 1.5rem;
+        }
+        .schema-header h3 {
+            margin: 0;
+            font-size: 1.25rem;
+        }
+        .schema-content {
+            padding: 1.5rem;
+        }
+        .schema-description {
+            color: #7f8c8d;
+            margin-bottom: 1rem;
+        }
+        .schema-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+        .schema-details {
+            background: #f8f9fa;
+            border-left: 4px solid #3498db;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 0 4px 4px 0;
+        }
+        .validation-rules {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 4px;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        .validation-rules h4 {
+            color: #856404;
+            margin-top: 0;
+        }
+        .validation-rules ul {
+            margin-bottom: 0;
+            color: #856404;
+        }
+        pre {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 1rem;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 0.9rem;
+        }
+        .example-section {
+            margin-top: 2rem;
+        }
+        .example-section h4 {
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>JSON Schemas</h1>
+        <p>Data validation schemas for the {{.Config.Title}} API</p>
+    </div>
+
+    <nav class="nav">
+        <ul>
+            <li><a href="/docs/">← Back to API Docs</a></li>
+            <li><a href="/docs/examples">Examples</a></li>
+            <li><a href="/docs/authentication">Authentication</a></li>
+            <li><a href="/docs/errors">Error Handling</a></li>
+        </ul>
+    </nav>
+
+    <div class="schema-grid">
+        {{range .Schemas}}
+        <div class="schema-card">
+            <div class="schema-header">
+                <h3>{{.Name}}</h3>
+            </div>
+            <div class="schema-content">
+                <p class="schema-description">{{.Description}}</p>
+                
+                <div class="schema-details">
+                    <strong>Schema File:</strong> <code>{{.FilePath}}</code>
+                </div>
+
+                {{if eq .Name "ContentItem"}}
+                <div class="validation-rules">
+                    <h4>Validation Rules</h4>
+                    <ul>
+                        <li>ID must be alphanumeric with hyphens/underscores only</li>
+                        <li>Type must be: product, video, article, course, or book</li>
+                        <li>Title is required (1-200 characters)</li>
+                        <li>At least one category is required</li>
+                        <li>Image URLs must be valid HTTP/HTTPS URLs</li>
+                        <li>Maximum 10 image URLs and categories</li>
+                    </ul>
+                </div>
+
+                <div class="example-section">
+                    <h4>Example</h4>
+                    <pre>{
+  "id": "prod-123",
+  "type": "product",
+  "title": "Wireless Headphones",
+  "description": "High-quality audio device",
+  "imageUrls": ["https://example.com/image.jpg"],
+  "categories": ["electronics", "audio"],
+  "metadata": {
+    "price": 199.99,
+    "brand": "AudioTech"
+  }
+}</pre>
+                </div>
+                {{end}}
+
+                {{if eq .Name "UserInteraction"}}
+                <div class="validation-rules">
+                    <h4>Validation Rules</h4>
+                    <ul>
+                        <li>User ID must be a valid UUID</li>
+                        <li>Item ID must be alphanumeric with hyphens/underscores</li>
+                        <li>Interaction type must be valid enum value</li>
+                        <li>Rating values must be between 1-5</li>
+                        <li>Duration values must be 0-86400 seconds</li>
+                        <li>Timestamp must be ISO 8601 format</li>
+                    </ul>
+                </div>
+
+                <div class="example-section">
+                    <h4>Example</h4>
+                    <pre>{
+  "userId": "550e8400-e29b-41d4-a716-446655440000",
+  "itemId": "prod-123",
+  "interactionType": "rating",
+  "value": 4.5,
+  "timestamp": "2024-01-15T10:30:00Z",
+  "context": {
+    "source": "product_page",
+    "device": "mobile"
+  }
+}</pre>
+                </div>
+                {{end}}
+
+                {{if eq .Name "Recommendation"}}
+                <div class="validation-rules">
+                    <h4>Validation Rules</h4>
+                    <ul>
+                        <li>Item ID must be valid content identifier</li>
+                        <li>Score must be between 0 and 1</li>
+                        <li>Algorithm must be valid enum value</li>
+                        <li>Confidence must be between 0 and 1</li>
+                        <li>Position must be positive integer</li>
+                        <li>Explanation type must match algorithm</li>
+                    </ul>
+                </div>
+
+                <div class="example-section">
+                    <h4>Example</h4>
+                    <pre>{
+  "itemId": "prod-789",
+  "score": 0.85,
+  "algorithm": "hybrid",
+  "confidence": 0.82,
+  "position": 1,
+  "explanation": {
+    "type": "content_based",
+    "message": "Similar to items you liked",
+    "evidence": {
+      "similarItems": ["prod-123"],
+      "confidence": 0.8
+    }
+  }
+}</pre>
+                </div>
+                {{end}}
+
+                {{if eq .Name "UserProfile"}}
+                <div class="validation-rules">
+                    <h4>Validation Rules</h4>
+                    <ul>
+                        <li>User ID must be a valid UUID</li>
+                        <li>Preference vector must be normalized (-1 to 1)</li>
+                        <li>Age group must be valid enum value</li>
+                        <li>Country must be ISO 3166-1 alpha-2 code</li>
+                        <li>Language must be ISO 639-1 format</li>
+                        <li>Maximum 50 interests and brands</li>
+                    </ul>
+                </div>
+
+                <div class="example-section">
+                    <h4>Example</h4>
+                    <pre>{
+  "userId": "550e8400-e29b-41d4-a716-446655440000",
+  "preferenceVector": [0.1, -0.3, 0.8],
+  "explicitPreferences": {
+    "categories": ["electronics", "books"],
+    "priceRange": {"min": 50, "max": 500}
+  },
+  "demographics": {
+    "ageGroup": "25-34",
+    "location": {"country": "US"},
+    "language": "en-US"
+  }
+}</pre>
+                </div>
+                {{end}}
+
+                {{if eq .Name "ErrorResponse"}}
+                <div class="validation-rules">
+                    <h4>Error Response Structure</h4>
+                    <ul>
+                        <li>Error code must be from predefined enum</li>
+                        <li>Message must be human-readable</li>
+                        <li>Timestamp must be ISO 8601 format</li>
+                        <li>Request ID must be valid UUID</li>
+                        <li>Fallback information when applicable</li>
+                    </ul>
+                </div>
+
+                <div class="example-section">
+                    <h4>Example</h4>
+                    <pre>{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Request validation failed",
+    "details": {
+      "field": "type",
+      "provided": "invalid_type"
+    },
+    "timestamp": "2024-01-15T10:30:00Z",
+    "requestId": "550e8400-e29b-41d4-a716-446655440000"
+  }
+}</pre>
+                </div>
+                {{end}}
+
+                <div class="schema-actions">
+                    <a href="{{.FilePath}}" class="btn btn-primary" target="_blank">View Schema</a>
+                    <a href="/docs/examples" class="btn btn-secondary">See Examples</a>
+                </div>
+            </div>
+        </div>
+        {{end}}
+    </div>
+
+    <div style="margin-top: 3rem; padding: 2rem; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <h2>Schema Validation</h2>
+        <p>All API requests and responses are validated against these JSON schemas. The API will return detailed validation errors if the data doesn't match the expected format.</p>
+        
+        <h3>Using Schemas</h3>
+        <ul>
+            <li><strong>Request Validation:</strong> All POST/PUT requests are validated against the appropriate schema</li>
+            <li><strong>Response Validation:</strong> API responses follow the documented schemas (in development mode)</li>
+            <li><strong>Client Generation:</strong> Use these schemas to generate client SDKs and type definitions</li>
+            <li><strong>Testing:</strong> Validate your test data against these schemas before sending requests</li>
+        </ul>
+
+        <h3>Schema Format</h3>
+        <p>All schemas follow <a href="https://json-schema.org/draft-07/schema" target="_blank">JSON Schema Draft 7</a> specification and include:</p>
+        <ul>
+            <li>Type definitions and constraints</li>
+            <li>Validation rules and error messages</li>
+            <li>Examples and documentation</li>
+            <li>Custom error codes for better debugging</li>
+        </ul>
+    </div>
+</body>
+</html>

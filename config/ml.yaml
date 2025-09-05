@@ -1,0 +1,131 @@
+# ML Service Configuration
+ml:
+  # Model configurations
+  models:
+    text-embedding:
+      name: "all-MiniLM-L6-v2"
+      path: "./models/all-MiniLM-L6-v2.onnx"
+      type: "text"
+      dimensions: 384
+      version: "1.0.0"
+      config:
+        max_sequence_length: 512
+        do_lower_case: true
+        vocab_size: 30522
+        hidden_size: 384
+        num_attention_heads: 12
+        num_hidden_layers: 6
+
+    image-embedding:
+      name: "clip-vit-base-patch32"
+      path: "./models/clip-vit-base-patch32.onnx"
+      type: "image"
+      dimensions: 512
+      version: "1.0.0"
+      config:
+        image_size: 224
+        patch_size: 32
+        num_channels: 3
+        hidden_size: 768
+        num_attention_heads: 12
+        num_hidden_layers: 12
+
+  # Text embedding service configuration
+  text_embedding:
+    max_tokens: 512
+    batch_size: 32
+    cache_prefix: "embed:text"
+    cache_ttl: "24h"
+    worker_count: 4
+
+  # Image embedding service configuration
+  image_embedding:
+    target_width: 224
+    target_height: 224
+    max_file_size: 10485760  # 10MB
+    timeout: "30s"
+    cache_prefix: "embed:image"
+    cache_ttl: "24h"
+
+  # Multi-modal fusion configuration
+  fusion:
+    text_dimensions: 384
+    image_dimensions: 512
+    final_dimensions: 768
+    text_weight: 0.6
+    image_weight: 0.4
+
+# Redis configuration for ML caching
+redis:
+  # Hot cache for frequently accessed embeddings
+  hot:
+    addr: "localhost:6379"
+    db: 0
+    max_retries: 3
+    pool_size: 10
+    min_idle_conns: 5
+
+  # Warm cache for moderately accessed embeddings
+  warm:
+    addr: "localhost:6380"
+    db: 0
+    max_retries: 3
+    pool_size: 8
+    min_idle_conns: 3
+
+  # Cold cache for long-term embedding storage
+  cold:
+    addr: "localhost:6381"
+    db: 0
+    max_retries: 3
+    pool_size: 5
+    min_idle_conns: 2
+
+# Performance optimization settings
+performance:
+  # Model instance pooling
+  model_pool_size: 10
+  
+  # Memory management
+  gc_percent: 100
+  max_memory_mb: 2048
+  
+  # Batch processing
+  max_batch_size: 64
+  batch_timeout: "100ms"
+  
+  # Concurrent processing
+  max_concurrent_requests: 100
+  request_timeout: "30s"
+
+# Monitoring and metrics
+monitoring:
+  # Metrics collection
+  enable_metrics: true
+  metrics_interval: "30s"
+  
+  # Performance tracking
+  track_latency: true
+  track_throughput: true
+  track_memory_usage: true
+  track_cache_hit_rate: true
+  
+  # Alerting thresholds
+  max_latency_ms: 2000
+  min_cache_hit_rate: 0.7
+  max_error_rate: 0.05
+
+# Development and testing settings
+development:
+  # Mock mode for testing without actual models
+  mock_mode: false
+  
+  # Deterministic embeddings for testing
+  deterministic_embeddings: false
+  
+  # Verbose logging
+  debug_logging: false
+  
+  # Performance profiling
+  enable_profiling: false
+  profiling_port: 6060

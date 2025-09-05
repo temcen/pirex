@@ -1,0 +1,380 @@
+/* Dashboard Styles */
+body {
+    background-color: #f8f9fa;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.navbar-brand {
+    font-weight: 600;
+}
+
+.content-section {
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Card Enhancements */
+.card {
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    transition: box-shadow 0.15s ease-in-out;
+}
+
+.card:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.card-header {
+    background-color: #fff;
+    border-bottom: 1px solid #dee2e6;
+    font-weight: 600;
+}
+
+/* Metric Cards */
+.card.bg-primary, .card.bg-success, .card.bg-info, .card.bg-warning {
+    border: none;
+    transition: transform 0.2s ease-in-out;
+}
+
+.card.bg-primary:hover, .card.bg-success:hover, .card.bg-info:hover, .card.bg-warning:hover {
+    transform: translateY(-2px);
+}
+
+/* Recommendation Grid */
+.recommendation-item {
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background: white;
+    transition: all 0.2s ease-in-out;
+    cursor: pointer;
+}
+
+.recommendation-item:hover {
+    border-color: #0d6efd;
+    box-shadow: 0 0.25rem 0.5rem rgba(13, 110, 253, 0.15);
+    transform: translateY(-1px);
+}
+
+.recommendation-image {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    border-radius: 0.25rem;
+    margin-bottom: 0.75rem;
+}
+
+.recommendation-title {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #212529;
+}
+
+.recommendation-description {
+    color: #6c757d;
+    font-size: 0.875rem;
+    margin-bottom: 0.75rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.recommendation-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.recommendation-price {
+    font-weight: 600;
+    color: #198754;
+    font-size: 1.1rem;
+}
+
+.recommendation-rating {
+    color: #ffc107;
+}
+
+.recommendation-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.recommendation-actions .btn {
+    flex: 1;
+    font-size: 0.875rem;
+}
+
+.explanation-tooltip {
+    position: relative;
+    display: inline-block;
+    cursor: help;
+}
+
+.explanation-tooltip .tooltip-text {
+    visibility: hidden;
+    width: 250px;
+    background-color: #333;
+    color: #fff;
+    text-align: left;
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+    position: absolute;
+    z-index: 1000;
+    bottom: 125%;
+    left: 50%;
+    margin-left: -125px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+
+.explanation-tooltip:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Health Status */
+.health-service {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    border-radius: 0.375rem;
+    background-color: #f8f9fa;
+}
+
+.health-service.healthy {
+    background-color: #d1e7dd;
+    border-left: 4px solid #198754;
+}
+
+.health-service.unhealthy {
+    background-color: #f8d7da;
+    border-left: 4px solid #dc3545;
+}
+
+.health-service.degraded {
+    background-color: #fff3cd;
+    border-left: 4px solid #ffc107;
+}
+
+.health-status-icon {
+    font-size: 1.25rem;
+}
+
+.health-status-icon.healthy {
+    color: #198754;
+}
+
+.health-status-icon.unhealthy {
+    color: #dc3545;
+}
+
+.health-status-icon.degraded {
+    color: #ffc107;
+}
+
+/* Connection Status */
+#connection-status {
+    font-size: 0.75rem;
+    margin-right: 0.25rem;
+}
+
+#connection-status.connected {
+    color: #198754 !important;
+}
+
+#connection-status.disconnected {
+    color: #dc3545 !important;
+}
+
+#connection-status.connecting {
+    color: #ffc107 !important;
+}
+
+/* Loading States */
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* Filters Panel */
+#filters-panel {
+    background-color: #f8f9fa;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    border: 1px solid #dee2e6;
+}
+
+/* Form Enhancements */
+.form-range::-webkit-slider-thumb {
+    background-color: #0d6efd;
+}
+
+.form-range::-moz-range-thumb {
+    background-color: #0d6efd;
+    border: none;
+}
+
+.form-check-input:checked {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+/* Recent Interactions */
+.interaction-item {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.interaction-item:last-child {
+    border-bottom: none;
+}
+
+.interaction-icon {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 0.75rem;
+    font-size: 0.875rem;
+}
+
+.interaction-icon.like {
+    background-color: #d1e7dd;
+    color: #198754;
+}
+
+.interaction-icon.click {
+    background-color: #cff4fc;
+    color: #0dcaf0;
+}
+
+.interaction-icon.view {
+    background-color: #e2e3e5;
+    color: #6c757d;
+}
+
+.interaction-details {
+    flex: 1;
+}
+
+.interaction-title {
+    font-weight: 500;
+    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+}
+
+.interaction-time {
+    font-size: 0.75rem;
+    color: #6c757d;
+}
+
+/* Chart Containers */
+.chart-container {
+    position: relative;
+    height: 300px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .recommendation-item {
+        margin-bottom: 1.5rem;
+    }
+    
+    .recommendation-actions {
+        flex-direction: column;
+    }
+    
+    .recommendation-actions .btn {
+        margin-bottom: 0.25rem;
+    }
+    
+    .health-service {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .health-service .badge {
+        margin-top: 0.5rem;
+    }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+    body {
+        background-color: #212529;
+        color: #fff;
+    }
+    
+    .card {
+        background-color: #343a40;
+        color: #fff;
+    }
+    
+    .card-header {
+        background-color: #343a40;
+        border-bottom-color: #495057;
+    }
+    
+    .recommendation-item {
+        background-color: #343a40;
+        border-color: #495057;
+        color: #fff;
+    }
+    
+    .recommendation-description {
+        color: #adb5bd;
+    }
+    
+    #filters-panel {
+        background-color: #343a40;
+        border-color: #495057;
+    }
+}
+
+/* Animation for metric updates */
+.metric-update {
+    animation: pulse 0.5s ease-in-out;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+/* Toast customization */
+.toast {
+    border: none;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.toast-header {
+    background-color: #0d6efd;
+    color: white;
+    border-bottom: none;
+}
+
+.toast-header .btn-close {
+    filter: invert(1);
+}

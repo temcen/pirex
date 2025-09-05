@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Recommendation Engine</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="css/dashboard.css" rel="stylesheet">
+    <style>
+        .admin-sidebar {
+            min-height: 100vh;
+            background-color: #343a40;
+        }
+        .admin-content {
+            min-height: 100vh;
+        }
+        .metric-card {
+            transition: transform 0.2s;
+        }
+        .metric-card:hover {
+            transform: translateY(-2px);
+        }
+        .config-section {
+            border-left: 4px solid #0d6efd;
+            padding-left: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="bi bi-gear-fill"></i>
+                Admin Dashboard
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="index.html">
+                    <i class="bi bi-arrow-left"></i> Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-2 admin-sidebar p-0">
+                <div class="list-group list-group-flush">
+                    <a href="#overview" class="list-group-item list-group-item-action bg-dark text-white active" data-section="overview">
+                        <i class="bi bi-speedometer2"></i> Overview
+                    </a>
+                    <a href="#analytics" class="list-group-item list-group-item-action bg-dark text-white" data-section="analytics">
+                        <i class="bi bi-graph-up"></i> Analytics
+                    </a>
+                    <a href="#content" class="list-group-item list-group-item-action bg-dark text-white" data-section="content">
+                        <i class="bi bi-file-earmark-text"></i> Content Management
+                    </a>
+                    <a href="#users" class="list-group-item list-group-item-action bg-dark text-white" data-section="users">
+                        <i class="bi bi-people"></i> User Management
+                    </a>
+                    <a href="#algorithms" class="list-group-item list-group-item-action bg-dark text-white" data-section="algorithms">
+                        <i class="bi bi-cpu"></i> Algorithm Config
+                    </a>
+                    <a href="#monitoring" class="list-group-item list-group-item-action bg-dark text-white" data-section="monitoring">
+                        <i class="bi bi-activity"></i> System Monitoring
+                    </a>
+                    <a href="#ab-testing" class="list-group-item list-group-item-action bg-dark text-white" data-section="ab-testing">
+                        <i class="bi bi-shuffle"></i> A/B Testing
+                    </a>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="col-md-10 admin-content p-4">
+                <!-- Overview Section -->
+                <div id="overview" class="admin-section">
+                    <h2 class="mb-4">System Overview</h2>
+                    
+                    <!-- Key Metrics -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card metric-card bg-primary text-white">
+                                <div class="card-body">
+                                    <h5>System Health</h5>
+                                    <h3 id="system-health-status">Healthy</h3>
+                                    <small>All services operational</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card metric-card bg-success text-white">
+                                <div class="card-body">
+                                    <h5>Active Users</h5>
+                                    <h3 id="admin-active-users">-</h3>
+                                    <small>Last 24 hours</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card metric-card bg-info text-white">
+                                <div class="card-body">
+                                    <h5>Recommendations</h5>
+                                    <h3 id="admin-total-recommendations">-</h3>
+                                    <small>Generated today</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card metric-card bg-warning text-dark">
+                                <div class="card-body">
+                                    <h5>Avg Response Time</h5>
+                                    <h3 id="admin-response-time">-</h3>
+                                    <small>Milliseconds</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- System Status -->
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>Service Status</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="admin-service-status">
+                                        <!-- Service status will be populated by JavaScript -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>Recent Alerts</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="recent-alerts">
+                                        <!-- Recent alerts will be populated by JavaScript -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Analytics Section -->
+                <div id="analytics" class="admin-section" style="display: none;">
+                    <h2 class="mb-4">Business Analytics</h2>
+                    
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>Revenue Impact</h5>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="revenue-chart" height="200"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>User Engagement Trends</h5>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="engagement-chart" height="200"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>Algorithm Performance Comparison</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-striped" id="algorithm-performance-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Algorithm</th>
+                                                    <th>CTR</th>
+                                                    <th>Conversion Rate</th>
+                                                    <th>Avg Confidence</th>
+                                                    <th>Performance Score</th>
+                                                    <th>Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <!-- Algorithm performance data will be populated by JavaScript -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Content Management Section -->
+                <div id="content" class="admin-section" style="display: none;">
+                    <h2 class="mb-4">Content Management</h2>
+                    
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h5>Total Content Items</h5>
+                                    <h3 id="total-content-items">-</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h5>Processing Queue</h5>
+                                    <h3 id="processing-queue-size">-</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h5>Failed Items</h5>
+                                    <h3 id="failed-content-items">-</h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between">
+                            <h5>Content Ingestion Status</h5>
+                            <button class="btn btn-primary btn-sm" id="refresh-content-status">
+                                <i class="bi bi-arrow-clockwise"></i> Refresh
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-striped" id="content-status-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Job ID</th>
+                                            <th>Content Type</th>
+                                            <th>Status</th>
+                                            <th>Progress</th>
+                                            <th>Created</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Content status data will be populated by JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- User Management Section -->
+                <div id="users" class="admin-section" style="display: none;">
+                    <h2 class="mb-4">User Management</h2>
+                    
+                    <div class="row mb-4">
+                        <div class="col-md-8">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>User Segmentation</h5>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="user-segmentation-chart" height="150"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>User Tiers</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="user-tier-stats">
+                                        <!-- User tier statistics will be populated by JavaScript -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h5>Privacy & Data Retention</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>Data Retention Settings</h6>
+                                    <div class="mb-3">
+                                        <label class="form-label">User Interactions Retention (days)</label>
+                                        <input type="number" class="form-control" id="interaction-retention" value="365">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Recommendation History Retention (days)</label>
+                                        <input type="number" class="form-control" id="recommendation-retention" value="90">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>Privacy Controls</h6>
+                                    <div class="form-check form-switch mb-2">
+                                        <input class="form-check-input" type="checkbox" id="gdpr-compliance" checked>
+                                        <label class="form-check-label" for="gdpr-compliance">
+                                            GDPR Compliance Mode
+                                        </label>
+                                    </div>
+                                    <div class="form-check form-switch mb-2">
+                                        <input class="form-check-input" type="checkbox" id="data-anonymization" checked>
+                                        <label class="form-check-label" for="data-anonymization">
+                                            Automatic Data Anonymization
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="btn btn-primary" id="save-privacy-settings">Save Settings</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Algorithm Configuration Section -->
+                <div id="algorithms" class="admin-section" style="display: none;">
+                    <h2 class="mb-4">Algorithm Configuration</h2>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>Algorithm Weights</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="config-section mb-4">
+                                        <h6>Semantic Search</h6>
+                                        <div class="mb-3">
+                                            <label class="form-label">Weight: <span id="semantic-weight-value">0.4</span></label>
+                                            <input type="range" class="form-range" id="semantic-weight" min="0" max="1" step="0.1" value="0.4">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Similarity Threshold</label>
+                                            <input type="number" class="form-control" id="semantic-threshold" value="0.7" step="0.1" min="0" max="1">
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="config-section mb-4">
+                                        <h6>Collaborative Filtering</h6>
+                                        <div class="mb-3">
+                                            <label class="form-label">Weight: <span id="collaborative-weight-value">0.3</span></label>
+                                            <input type="range" class="form-range" id="collaborative-weight" min="0" max="1" step="0.1" value="0.3">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Min User Similarity</label>
+                                            <input type="number" class="form-control" id="collaborative-threshold" value="0.5" step="0.1" min="0" max="1">
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="config-section mb-4">
+                                        <h6>PageRank</h6>
+                                        <div class="mb-3">
+                                            <label class="form-label">Weight: <span id="pagerank-weight-value">0.3</span></label>
+                                            <input type="range" class="form-range" id="pagerank-weight" min="0" max="1" step="0.1" value="0.3">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Damping Factor</label>
+                                            <input type="number" class="form-control" id="pagerank-damping" value="0.85" step="0.05" min="0" max="1">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>Diversity & Serendipity</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label class="form-label">Intra-list Diversity: <span id="diversity-value">0.3</span></label>
+                                        <input type="range" class="form-range" id="diversity-weight" min="0" max="1" step="0.1" value="0.3">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Max Items per Category</label>
+                                        <input type="number" class="form-control" id="category-max" value="3" min="1" max="10">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Serendipity Ratio: <span id="serendipity-value">0.15</span></label>
+                                        <input type="range" class="form-range" id="serendipity-ratio" min="0" max="0.5" step="0.05" value="0.15">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="card mt-4">
+                                <div class="card-header">
+                                    <h5>Feature Flags</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="form-check form-switch mb-2">
+                                        <input class="form-check-input" type="checkbox" id="enable-ml-ranking" checked>
+                                        <label class="form-check-label" for="enable-ml-ranking">
+                                            ML-based Ranking
+                                        </label>
+                                    </div>
+                                    <div class="form-check form-switch mb-2">
+                                        <input class="form-check-input" type="checkbox" id="enable-real-time-learning" checked>
+                                        <label class="form-check-label" for="enable-real-time-learning">
+                                            Real-time Learning
+                                        </label>
+                                    </div>
+                                    <div class="form-check form-switch mb-2">
+                                        <input class="form-check-input" type="checkbox" id="enable-explanation-service" checked>
+                                        <label class="form-check-label" for="enable-explanation-service">
+                                            Explanation Service
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <button class="btn btn-primary me-2" id="save-algorithm-config">Save Configuration</button>
+                            <button class="btn btn-outline-secondary me-2" id="reset-algorithm-config">Reset to Defaults</button>
+                            <button class="btn btn-outline-warning" id="test-algorithm-config">Test Configuration</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- System Monitoring Section -->
+                <div id="monitoring" class="admin-section" style="display: none;">
+                    <h2 class="mb-4">System Monitoring</h2>
+                    
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h5>CPU Usage</h5>
+                                    <h3 id="cpu-usage">-</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h5>Memory Usage</h5>
+                                    <h3 id="memory-usage">-</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h5>Active Connections</h5>
+                                    <h3 id="active-connections">-</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h5>Cache Hit Rate</h5>
+                                    <h3 id="cache-hit-rate">-</h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>System Performance</h5>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="system-performance-chart" height="150"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>Database Connections</h5>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="db-connections-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- A/B Testing Section -->
+                <div id="ab-testing" class="admin-section" style="display: none;">
+                    <h2 class="mb-4">A/B Testing</h2>
+                    
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <div class="card">
+                                <div class="card-header d-flex justify-content-between">
+                                    <h5>Active Tests</h5>
+                                    <button class="btn btn-primary btn-sm" id="create-ab-test">
+                                        <i class="bi bi-plus"></i> Create Test
+                                    </button>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-striped" id="ab-tests-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Test Name</th>
+                                                    <th>Status</th>
+                                                    <th>Traffic Split</th>
+                                                    <th>Conversion Rate</th>
+                                                    <th>Statistical Significance</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <!-- A/B test data will be populated by JavaScript -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/admin.js"></script>
+</body>
+</html>

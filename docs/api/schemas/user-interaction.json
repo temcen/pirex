@@ -1,0 +1,191 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://api.recommendations.example.com/schemas/user-interaction.json",
+  "title": "User Interaction",
+  "description": "Schema for validating user interaction input",
+  "type": "object",
+  "properties": {
+    "userId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "ID of the user performing the interaction"
+    },
+    "itemId": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]+$",
+      "minLength": 1,
+      "maxLength": 100,
+      "description": "ID of the content item being interacted with"
+    },
+    "interactionType": {
+      "type": "string",
+      "enum": ["rating", "like", "dislike", "share", "click", "view", "search", "browse"],
+      "description": "Type of interaction"
+    },
+    "value": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Numeric value associated with interaction"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the interaction occurred (ISO 8601 format)"
+    },
+    "sessionId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Session ID for grouping related interactions"
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "source": {
+          "type": "string",
+          "enum": ["search_results", "product_page", "category_page", "home_page", "recommendations", "related_items"],
+          "description": "Source of the interaction"
+        },
+        "device": {
+          "type": "string",
+          "enum": ["mobile", "tablet", "desktop", "tv", "watch"],
+          "description": "Device type used for interaction"
+        },
+        "duration": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 86400,
+          "description": "Duration of interaction in seconds"
+        },
+        "position": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "description": "Position of item in list (for click/view interactions)"
+        },
+        "query": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Search query (for search interactions)"
+        },
+        "referrer": {
+          "type": "string",
+          "format": "uri",
+          "description": "Referrer URL"
+        },
+        "userAgent": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "User agent string"
+        }
+      },
+      "description": "Additional context about the interaction"
+    }
+  },
+  "required": ["userId", "itemId", "interactionType"],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "interactionType": {"const": "rating"}
+        }
+      },
+      "then": {
+        "properties": {
+          "value": {
+            "minimum": 1,
+            "maximum": 5,
+            "description": "Rating value must be between 1 and 5"
+          }
+        },
+        "required": ["value"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "interactionType": {"enum": ["view", "click"]}
+        }
+      },
+      "then": {
+        "properties": {
+          "value": {
+            "minimum": 0,
+            "maximum": 86400,
+            "description": "Duration in seconds for view/click interactions"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "interactionType": {"const": "search"}
+        }
+      },
+      "then": {
+        "properties": {
+          "context": {
+            "required": ["query"]
+          }
+        }
+      }
+    }
+  ],
+  "examples": [
+    {
+      "userId": "550e8400-e29b-41d4-a716-446655440000",
+      "itemId": "prod-123",
+      "interactionType": "rating",
+      "value": 4.5,
+      "timestamp": "2024-01-15T10:30:00Z",
+      "sessionId": "550e8400-e29b-41d4-a716-446655440001",
+      "context": {
+        "source": "product_page",
+        "device": "mobile"
+      }
+    },
+    {
+      "userId": "550e8400-e29b-41d4-a716-446655440000",
+      "itemId": "prod-456",
+      "interactionType": "view",
+      "value": 45.5,
+      "timestamp": "2024-01-15T10:25:00Z",
+      "sessionId": "550e8400-e29b-41d4-a716-446655440001",
+      "context": {
+        "source": "search_results",
+        "device": "desktop",
+        "duration": 45.5,
+        "position": 3
+      }
+    },
+    {
+      "userId": "550e8400-e29b-41d4-a716-446655440000",
+      "itemId": "",
+      "interactionType": "search",
+      "timestamp": "2024-01-15T10:20:00Z",
+      "sessionId": "550e8400-e29b-41d4-a716-446655440001",
+      "context": {
+        "query": "wireless headphones",
+        "source": "home_page",
+        "device": "mobile"
+      }
+    }
+  ],
+  "errorMessage": {
+    "properties": {
+      "userId": "User ID must be a valid UUID",
+      "itemId": "Item ID must be a non-empty string with only alphanumeric characters, hyphens, and underscores",
+      "interactionType": "Interaction type must be one of: rating, like, dislike, share, click, view, search, browse",
+      "value": "Value must be a non-negative number",
+      "timestamp": "Timestamp must be in ISO 8601 date-time format",
+      "sessionId": "Session ID must be a valid UUID"
+    },
+    "required": {
+      "userId": "User ID is required",
+      "itemId": "Item ID is required",
+      "interactionType": "Interaction type is required"
+    }
+  }
+}

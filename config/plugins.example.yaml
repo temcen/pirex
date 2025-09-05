@@ -1,0 +1,59 @@
+# External System Plugins Configuration
+plugins:
+  - name: crm_plugin
+    type: crm
+    enabled: true
+    timeout: 5s
+    retry_count: 3
+    config:
+      api_url: "https://api.crm-system.com/v1"
+      api_key: "${CRM_API_KEY}"
+      timeout: "5s"
+    environment:
+      CRM_API_KEY: "your-crm-api-key-here"
+
+  - name: social_media_plugin
+    type: social_media
+    enabled: true
+    timeout: 10s
+    retry_count: 2
+    config:
+      platforms:
+        twitter:
+          api_key: "${TWITTER_API_KEY}"
+          base_url: "https://api.twitter.com/2"
+          enabled: true
+        facebook:
+          api_key: "${FACEBOOK_API_KEY}"
+          base_url: "https://graph.facebook.com/v18.0"
+          enabled: false
+        linkedin:
+          api_key: "${LINKEDIN_API_KEY}"
+          base_url: "https://api.linkedin.com/v2"
+          enabled: true
+    environment:
+      TWITTER_API_KEY: "your-twitter-api-key"
+      FACEBOOK_API_KEY: "your-facebook-api-key"
+      LINKEDIN_API_KEY: "your-linkedin-api-key"
+
+  - name: weather_plugin
+    type: contextual
+    enabled: false
+    timeout: 3s
+    retry_count: 1
+    config:
+      api_url: "https://api.openweathermap.org/data/2.5"
+      api_key: "${WEATHER_API_KEY}"
+    environment:
+      WEATHER_API_KEY: "your-weather-api-key"
+
+  - name: location_plugin
+    type: contextual
+    enabled: false
+    timeout: 2s
+    retry_count: 1
+    config:
+      api_url: "https://api.ipgeolocation.io/ipgeo"
+      api_key: "${LOCATION_API_KEY}"
+    environment:
+      LOCATION_API_KEY: "your-location-api-key"

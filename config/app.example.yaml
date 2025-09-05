@@ -1,0 +1,97 @@
+# Example configuration for Content Ingestion and Processing Pipeline
+
+server:
+  port: "8080"
+  mode: "development"
+
+database:
+  url: "postgres://user:password@localhost:5432/recommendations?sslmode=disable"
+  max_connections: 25
+  max_idle_time: "15m"
+  max_lifetime: "1h"
+  connect_timeout: "10s"
+
+redis:
+  hot:
+    url: "redis://localhost:6379"
+    max_retries: 3
+    pool_size: 10
+    timeout: "5s"
+  warm:
+    url: "redis://localhost:6380"
+    max_retries: 3
+    pool_size: 5
+    timeout: "10s"
+  cold:
+    url: "redis://localhost:6381"
+    max_retries: 3
+    pool_size: 5
+    timeout: "15s"
+
+neo4j:
+  url: "bolt://localhost:7687"
+  username: "neo4j"
+  password: "password"
+
+kafka:
+  brokers:
+    - "localhost:9092"
+  topics:
+    content_ingestion: "content-ingestion"
+    user_interactions: "user-interactions"
+
+auth:
+  jwt_secret: "your-secret-key-here"
+  token_ttl: "24h"
+  rate_limit:
+    default: 1000
+    premium: 10000
+    window: "1h"
+
+logging:
+  level: "info"
+  format: "text"
+
+recommendation:
+  semantic_search:
+    enabled: true
+    weight: 0.4
+    similarity_threshold: 0.7
+  collaborative_filtering:
+    enabled: true
+    weight: 0.3
+    similarity_threshold: 0.5
+  pagerank:
+    enabled: true
+    weight: 0.3
+    similarity_threshold: 0.0
+  
+  diversity:
+    intra_list_diversity: 0.3
+    category_max_items: 3
+    serendipity_ratio: 0.15
+  
+  caching:
+    embeddings_ttl: "24h"
+    recommendations_ttl: "15m"
+    metadata_ttl: "1h"
+    graph_results_ttl: "30m"
+
+models:
+  text_embedding:
+    model_path: "./models/all-MiniLM-L6-v2.onnx"
+    dimensions: 384
+  image_embedding:
+    model_path: "./models/clip-vit-base-patch32.onnx"
+    dimensions: 512
+
+monitoring:
+  enabled: true
+  port: "9090"
+  metrics_path: "/metrics"
+
+security:
+  cors:
+    allowed_origins: ["*"]
+    allowed_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    allowed_headers: ["*"]

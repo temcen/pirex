@@ -1,0 +1,1077 @@
+openapi: 3.0.3
+info:
+  title: Recommendation Engine API
+  description: |
+    A comprehensive recommendation engine API that provides personalized content recommendations
+    using multiple algorithms including semantic search, collaborative filtering, and graph-based approaches.
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: api-support@example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Development server
+  - url: https://api.recommendations.example.com/api/v1
+    description: Production server
+
+security:
+  - BearerAuth: []
+
+paths:
+  /content:
+    post:
+      summary: Ingest single content item
+      description: Add a new content item to the recommendation system for processing
+      operationId: ingestContent
+      tags:
+        - Content Management
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContentItem'
+            examples:
+              product:
+                summary: Product content example
+                value:
+                  id: "prod-123"
+                  type: "product"
+                  title: "Wireless Bluetooth Headphones"
+                  description: "High-quality wireless headphones with noise cancellation"
+                  imageUrls: ["https://example.com/images/headphones.jpg"]
+                  metadata:
+                    price: 199.99
+                    brand: "AudioTech"
+                    color: "black"
+                  categories: ["electronics", "audio", "headphones"]
+      responses:
+        '202':
+          description: Content accepted for processing
+          headers:
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+              description: Number of requests remaining in current window
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+              description: Unix timestamp when rate limit resets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentIngestionResponse'
+              example:
+                jobId: "job-456"
+                status: "queued"
+                estimatedTime: "30s"
+                message: "Content queued for processing"
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /content/batch:
+    post:
+      summary: Bulk content ingestion
+      description: Upload multiple content items in a single request
+      operationId: ingestContentBatch
+      tags:
+        - Content Management
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/ContentItem'
+                  maxItems: 100
+                  minItems: 1
+              required:
+                - items
+      responses:
+        '202':
+          description: Batch accepted for processing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  batchId:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [queued, processing]
+                  totalItems:
+                    type: integer
+                  estimatedTime:
+                    type: string
+                  jobIds:
+                    type: array
+                    items:
+                      type: string
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+
+  /content/jobs/{jobId}:
+    get:
+      summary: Get content processing job status
+      description: Check the status of a content ingestion job
+      operationId: getJobStatus
+      tags:
+        - Content Management
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Job ID returned from content ingestion
+      responses:
+        '200':
+          description: Job status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /interactions:
+    post:
+      summary: Record user interaction
+      description: Record explicit or implicit user interactions with content
+      operationId: recordInteraction
+      tags:
+        - User Interactions
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserInteraction'
+            examples:
+              explicit_rating:
+                summary: Explicit rating interaction
+                value:
+                  userId: "user-123"
+                  itemId: "prod-456"
+                  interactionType: "rating"
+                  value: 4.5
+                  timestamp: "2024-01-15T10:30:00Z"
+                  sessionId: "session-789"
+                  context:
+                    source: "product_page"
+                    device: "mobile"
+              implicit_view:
+                summary: Implicit view interaction
+                value:
+                  userId: "user-123"
+                  itemId: "prod-456"
+                  interactionType: "view"
+                  value: 45.5
+                  timestamp: "2024-01-15T10:25:00Z"
+                  sessionId: "session-789"
+                  context:
+                    duration: 45.5
+                    source: "search_results"
+      responses:
+        '201':
+          description: Interaction recorded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  interactionId:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [recorded, queued]
+                  message:
+                    type: string
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+
+  /interactions/batch:
+    post:
+      summary: Record multiple interactions
+      description: Bulk upload of user interactions
+      operationId: recordInteractionsBatch
+      tags:
+        - User Interactions
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                interactions:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/UserInteraction'
+                  maxItems: 1000
+                  minItems: 1
+              required:
+                - interactions
+      responses:
+        '201':
+          description: Interactions recorded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  batchId:
+                    type: string
+                    format: uuid
+                  totalRecorded:
+                    type: integer
+                  failed:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        index:
+                          type: integer
+                        error:
+                          type: string
+
+  /recommendations/{userId}:
+    get:
+      summary: Get personalized recommendations
+      description: Retrieve personalized content recommendations for a specific user
+      operationId: getRecommendations
+      tags:
+        - Recommendations
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: User ID to get recommendations for
+        - name: count
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+          description: Number of recommendations to return
+        - name: context
+          in: query
+          schema:
+            type: string
+            enum: [home, search, product_page, category, checkout]
+            default: home
+          description: Context where recommendations will be displayed
+        - name: explain
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Include explanation for each recommendation
+        - name: categories
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: false
+          description: Filter recommendations by categories
+        - name: exclude
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: false
+          description: Item IDs to exclude from recommendations
+      responses:
+        '200':
+          description: Recommendations retrieved successfully
+          headers:
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecommendationResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+
+  /recommendations/batch:
+    post:
+      summary: Get recommendations for multiple users
+      description: Bulk recommendation generation for multiple users
+      operationId: getRecommendationsBatch
+      tags:
+        - Recommendations
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  maxItems: 100
+                  minItems: 1
+                count:
+                  type: integer
+                  minimum: 1
+                  maximum: 50
+                  default: 10
+                context:
+                  type: string
+                  enum: [home, search, product_page, category, checkout]
+                  default: home
+              required:
+                - userIds
+      responses:
+        '200':
+          description: Batch recommendations retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        userId:
+                          type: string
+                          format: uuid
+                        recommendations:
+                          type: array
+                          items:
+                            $ref: '#/components/schemas/Recommendation'
+                        error:
+                          type: string
+
+  /recommendations/{userId}/similar/{itemId}:
+    get:
+      summary: Get item-based recommendations
+      description: Get recommendations similar to a specific item for a user
+      operationId: getSimilarRecommendations
+      tags:
+        - Recommendations
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: count
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        '200':
+          description: Similar recommendations retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecommendationResponse'
+
+  /users/{userId}/interactions:
+    get:
+      summary: Get user interaction history
+      description: Retrieve interaction history for a specific user
+      operationId: getUserInteractions
+      tags:
+        - User Interactions
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [rating, like, dislike, share, click, view, search, browse]
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: User interactions retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  interactions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserInteraction'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /feedback:
+    post:
+      summary: Record recommendation feedback
+      description: Record user feedback on recommendation quality
+      operationId: recordFeedback
+      tags:
+        - Feedback
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                  format: uuid
+                recommendationId:
+                  type: string
+                  format: uuid
+                itemId:
+                  type: string
+                feedbackType:
+                  type: string
+                  enum: [helpful, not_helpful, irrelevant, offensive]
+                rating:
+                  type: number
+                  minimum: 1
+                  maximum: 5
+                comment:
+                  type: string
+                  maxLength: 500
+              required:
+                - userId
+                - recommendationId
+                - itemId
+                - feedbackType
+      responses:
+        '201':
+          description: Feedback recorded successfully
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for authentication
+
+  schemas:
+    ContentItem:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the content item
+          example: "prod-123"
+        type:
+          type: string
+          enum: [product, video, article, course, book]
+          description: Type of content
+          example: "product"
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Title of the content item
+          example: "Wireless Bluetooth Headphones"
+        description:
+          type: string
+          maxLength: 2000
+          description: Detailed description of the content
+          example: "High-quality wireless headphones with active noise cancellation"
+        imageUrls:
+          type: array
+          items:
+            type: string
+            format: uri
+          maxItems: 10
+          description: Array of image URLs
+          example: ["https://example.com/images/headphones.jpg"]
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Additional metadata specific to content type
+          example:
+            price: 199.99
+            brand: "AudioTech"
+            color: "black"
+        categories:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          maxItems: 10
+          description: Categories this content belongs to
+          example: ["electronics", "audio", "headphones"]
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+        - id
+        - type
+        - title
+        - categories
+
+    UserInteraction:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: ID of the user performing the interaction
+        itemId:
+          type: string
+          description: ID of the content item being interacted with
+        interactionType:
+          type: string
+          enum: [rating, like, dislike, share, click, view, search, browse]
+          description: Type of interaction
+        value:
+          type: number
+          description: Numeric value associated with interaction (rating score, duration, etc.)
+          minimum: 0
+        timestamp:
+          type: string
+          format: date-time
+          description: When the interaction occurred
+        sessionId:
+          type: string
+          format: uuid
+          description: Session ID for grouping related interactions
+        context:
+          type: object
+          additionalProperties: true
+          description: Additional context about the interaction
+          example:
+            source: "search_results"
+            device: "mobile"
+            duration: 45.5
+      required:
+        - userId
+        - itemId
+        - interactionType
+        - timestamp
+
+    Recommendation:
+      type: object
+      properties:
+        itemId:
+          type: string
+          description: ID of the recommended content item
+        score:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Recommendation score (0-1)
+        algorithm:
+          type: string
+          enum: [semantic_search, collaborative_filtering, pagerank, popularity, hybrid]
+          description: Algorithm used to generate this recommendation
+        explanation:
+          $ref: '#/components/schemas/Explanation'
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Confidence score for this recommendation
+        position:
+          type: integer
+          minimum: 1
+          description: Position in the recommendation list
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Additional metadata about the recommendation
+      required:
+        - itemId
+        - score
+        - algorithm
+        - confidence
+        - position
+
+    Explanation:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [content_based, collaborative, graph_based, popularity_based]
+          description: Type of explanation
+        message:
+          type: string
+          description: Human-readable explanation
+          example: "Because you liked 'Wireless Mouse' and both are in electronics category"
+        evidence:
+          type: object
+          properties:
+            similarItems:
+              type: array
+              items:
+                type: string
+              description: Items that contributed to this recommendation
+            sharedUsers:
+              type: integer
+              description: Number of users with similar preferences
+            categories:
+              type: array
+              items:
+                type: string
+              description: Shared categories
+            confidence:
+              type: number
+              minimum: 0
+              maximum: 1
+        details:
+          type: object
+          additionalProperties: true
+          description: Additional explanation details
+      required:
+        - type
+        - message
+
+    UserProfile:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: Unique user identifier
+        preferenceVector:
+          type: array
+          items:
+            type: number
+          description: User preference embedding vector
+        explicitPreferences:
+          type: object
+          properties:
+            categories:
+              type: array
+              items:
+                type: string
+            brands:
+              type: array
+              items:
+                type: string
+            priceRange:
+              type: object
+              properties:
+                min:
+                  type: number
+                max:
+                  type: number
+        behaviorPatterns:
+          type: object
+          properties:
+            avgSessionDuration:
+              type: number
+            preferredTimeOfDay:
+              type: string
+            devicePreference:
+              type: string
+            interactionFrequency:
+              type: string
+              enum: [low, medium, high]
+        demographics:
+          type: object
+          properties:
+            ageGroup:
+              type: string
+            location:
+              type: string
+            interests:
+              type: array
+              items:
+                type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - userId
+
+    ContentIngestionResponse:
+      type: object
+      properties:
+        jobId:
+          type: string
+          format: uuid
+          description: Unique job identifier for tracking processing
+        status:
+          type: string
+          enum: [queued, processing, completed, failed]
+          description: Current status of the ingestion job
+        estimatedTime:
+          type: string
+          description: Estimated processing time
+          example: "30s"
+        message:
+          type: string
+          description: Human-readable status message
+      required:
+        - jobId
+        - status
+
+    JobStatus:
+      type: object
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [queued, processing, completed, failed]
+        progress:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Processing progress percentage
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        error:
+          type: string
+          description: Error message if job failed
+        results:
+          type: object
+          properties:
+            embeddingsGenerated:
+              type: boolean
+            metadataStored:
+              type: boolean
+            indexUpdated:
+              type: boolean
+
+    RecommendationResponse:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        recommendations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Recommendation'
+        metadata:
+          type: object
+          properties:
+            totalAvailable:
+              type: integer
+            algorithmsUsed:
+              type: array
+              items:
+                type: string
+            generatedAt:
+              type: string
+              format: date-time
+            cacheHit:
+              type: boolean
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    Pagination:
+      type: object
+      properties:
+        limit:
+          type: integer
+        offset:
+          type: integer
+        total:
+          type: integer
+        hasMore:
+          type: boolean
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: Machine-readable error code
+            message:
+              type: string
+              description: Human-readable error message
+            details:
+              type: object
+              additionalProperties: true
+              description: Additional error details
+            timestamp:
+              type: string
+              format: date-time
+            requestId:
+              type: string
+              format: uuid
+              description: Unique request identifier for debugging
+          required:
+            - code
+            - message
+            - timestamp
+        fallback:
+          type: object
+          properties:
+            used:
+              type: boolean
+              description: Whether fallback data was used
+            strategy:
+              type: string
+              description: Fallback strategy employed
+            confidence:
+              type: number
+              minimum: 0
+              maximum: 1
+              description: Confidence in fallback data
+
+  responses:
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            invalid_content_type:
+              summary: Invalid content type
+              value:
+                error:
+                  code: "INVALID_CONTENT_TYPE"
+                  message: "Content type must be one of: product, video, article, course, book"
+                  details:
+                    field: "type"
+                    provided: "invalid_type"
+                    allowed: ["product", "video", "article", "course", "book"]
+                  timestamp: "2024-01-15T10:30:00Z"
+                  requestId: "req-123"
+            missing_required_field:
+              summary: Missing required field
+              value:
+                error:
+                  code: "MISSING_REQUIRED_FIELD"
+                  message: "Required field 'title' is missing"
+                  details:
+                    field: "title"
+                    required: true
+                  timestamp: "2024-01-15T10:30:00Z"
+                  requestId: "req-124"
+
+    UnauthorizedError:
+      description: Authentication required or invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: "UNAUTHORIZED"
+              message: "Valid JWT token required"
+              details:
+                reason: "token_expired"
+              timestamp: "2024-01-15T10:30:00Z"
+              requestId: "req-125"
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            user_not_found:
+              summary: User not found
+              value:
+                error:
+                  code: "USER_NOT_FOUND"
+                  message: "User with ID 'user-123' not found"
+                  details:
+                    userId: "user-123"
+                  timestamp: "2024-01-15T10:30:00Z"
+                  requestId: "req-126"
+                fallback:
+                  used: true
+                  strategy: "popular_recommendations"
+                  confidence: 0.3
+
+    RateLimitError:
+      description: Rate limit exceeded
+      headers:
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+          description: Request limit per window
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+          description: Requests remaining in current window
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+          description: Unix timestamp when limit resets
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds to wait before retrying
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: "RATE_LIMIT_EXCEEDED"
+              message: "Rate limit of 1000 requests per hour exceeded"
+              details:
+                limit: 1000
+                window: "1h"
+                retryAfter: 3600
+              timestamp: "2024-01-15T10:30:00Z"
+              requestId: "req-127"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            embedding_generation_failed:
+              summary: Embedding generation failed
+              value:
+                error:
+                  code: "EMBEDDING_GENERATION_FAILED"
+                  message: "Failed to generate embeddings for content"
+                  details:
+                    contentId: "prod-123"
+                    stage: "text_embedding"
+                  timestamp: "2024-01-15T10:30:00Z"
+                  requestId: "req-128"
+                fallback:
+                  used: true
+                  strategy: "cached_embeddings"
+                  confidence: 0.8
+            database_connection_error:
+              summary: Database connection error
+              value:
+                error:
+                  code: "DATABASE_CONNECTION_ERROR"
+                  message: "Unable to connect to database"
+                  details:
+                    database: "postgresql"
+                    timeout: "5s"
+                  timestamp: "2024-01-15T10:30:00Z"
+                  requestId: "req-129"
+
+tags:
+  - name: Content Management
+    description: Operations for managing content ingestion and processing
+  - name: User Interactions
+    description: Operations for tracking and managing user interactions
+  - name: Recommendations
+    description: Operations for generating and retrieving recommendations
+  - name: Feedback
+    description: Operations for collecting and processing user feedback

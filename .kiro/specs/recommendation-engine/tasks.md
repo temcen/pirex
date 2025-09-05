@@ -1,0 +1,437 @@
+# Implementation Plan
+
+## Overview
+
+This implementation plan breaks down the recommendation engine development into manageable coding tasks. Each task builds incrementally on previous work, following test-driven development principles and ensuring early validation of core functionality.
+
+## Task List
+
+- [x] 1. Project Foundation and Infrastructure
+  - **Go Project Setup**: Create `go.mod` with dependencies (Gin, pgx, Neo4j driver, Redis, Kafka, ONNX, JWT, Viper, Prometheus)
+  - **Directory Structure**: Organize as `cmd/`, `internal/`, `pkg/`, `config/`, `models/`, `scripts/`, `docs/`
+  - **Docker Environment**: Create `docker-compose.dev.yml` with PostgreSQL+pgvector, Neo4j+GDS, Redis cluster (3 instances), Kafka+Zookeeper, PgBouncer
+  - **Database Schemas**: PostgreSQL tables for content_items, user_profiles, user_interactions with vector columns and indexes
+  - **Neo4j Schema**: Create constraints and indexes for User/Content nodes, relationship types (RATED, VIEWED, INTERACTED_WITH, SIMILAR_TO)
+  - **Configuration**: Implement Viper config loading with `config/app.yaml` for business logic, environment variables for secrets
+  - **Logging**: Set up structured logging with logrus, different log levels for development/production
+  - **Health Checks**: Implement tiered health checks (critical: PostgreSQL, Redis-hot; non-critical: Neo4j, Redis-warm/cold, Kafka)
+  - **Authentication**: JWT middleware with user sessions, rate limiting per API key/user using Redis sliding window
+  - **Security**: CORS, input validation, request sanitization middleware
+  - _Requirements: 6.1, 6.2, 5.1, 5.2, 9.2_
+
+- [x] 2. Content Ingestion and Processing Pipeline
+  - **Content Ingestion API**:
+    - REST endpoints: `POST /api/v1/content` (single), `POST /api/v1/content/batch` (bulk upload)
+    - JSON Schema validation: required fields (id, type, title), optional fields (description, imageUrls, metadata, categories)
+    - Content type abstraction: support products, videos, articles with type-specific validation rules
+    - Async job creation: return `{jobId, status: "queued", estimatedTime}` for processing tracking
+    - Status endpoint: `GET /api/v1/content/jobs/{jobId}` returns processing progress and errors
+  - **Kafka Message Bus Integration**:
+    - Producer setup: topic `content-ingestion` with 3 partitions, key by content type for load balancing
+    - Message format: `{jobId, contentItem, timestamp, retryCount, processingHints}`
+    - Consumer group: `content-processors` with 3 consumer instances for parallel processing
+    - Error handling: dead letter queue `content-ingestion-dlq` for failed messages after 3 retries
+    - Monitoring: track message lag, processing time, error rates using Kafka metrics
+  - **Data Preprocessor Service**:
+    - **Text Processing**: Clean HTML tags, normalize Unicode, remove special characters, extract keywords using TF-IDF
+    - **Image Processing**: Validate image URLs (HTTP status, content-type, file size < 10MB), extract metadata (dimensions, format)
+    - **Feature Extraction**: Generate content fingerprints, detect language, extract entities using regex patterns
+    - **Normalization**: Standardize categories to predefined taxonomy, validate metadata schemas
+    - **Quality Scoring**: Calculate content quality based on completeness, text length, image availability (0-1 score)
+  - **Pipeline Orchestration**:
+    - Goroutine workers: 5 concurrent processors, each handling one message at a time
+    - Processing stages: Validate → Preprocess → Generate Embeddings → Store → Update Cache
+    - Error recovery: exponential backoff for transient failures, skip and log for permanent failures
+    - Progress tracking: update job status in Redis with detailed progress information
+  - **Testing**: Unit tests for each processing stage, integration tests with mock Kafka, end-to-end tests with sample content
+  - _Requirements: 1.1, 1.2, 1.3, 1.6_
+
+- [x] 3. ML Models and Embedding Generation
+  - **ONNX Model Setup**: Download and integrate `all-MiniLM-L6-v2.onnx` (384 dims) and `clip-vit-base-patch32.onnx` (512 dims) models
+  - **Model Registry**: Implement `ModelRegistry` struct with lazy loading, thread-safe caching using `sync.Map`, model versioning
+  - **Text Embedding Service**: 
+    - Tokenization using BERT tokenizer (handle max 512 tokens)
+    - Batch processing for efficiency (process up to 32 texts simultaneously)
+    - L2 normalization of output vectors
+    - Caching in Redis-cold with 24h TTL using hierarchical keys `embed:text:model_version:content_hash`
+  - **Image Embedding Service**:
+    - Image preprocessing (resize to 224x224, normalize RGB values)
+    - URL-based image fetching with timeout and size limits
+    - CLIP model inference with proper tensor formatting
+    - Cache embeddings with content-based keys
+  - **Multi-Modal Fusion**: 
+    - Late fusion by concatenating normalized text (384) + image (512) embeddings = 896 dimensions
+    - Implement early fusion hooks for future enhancement
+    - Standardize final embedding to 768 dimensions using learned projection layer
+  - **Performance Optimization**: 
+    - Model instance pooling using `sync.Pool` to handle concurrent requests
+    - Goroutine workers for batch processing
+    - Memory management for large embedding operations
+  - **Testing**: Unit tests with known input/output pairs, performance benchmarks for embedding generation speed
+  - _Requirements: 1.4, 3.1, 10.2_
+
+- [x] 4. User Interaction and Profile Management
+  - **User Interaction API**:
+    - **Explicit Feedback**: `POST /api/v1/interactions/explicit` with `{userId, itemId, type: "rating|like|dislike|share", value, timestamp}`
+    - **Implicit Feedback**: `POST /api/v1/interactions/implicit` with `{userId, itemId?, type: "click|view|search|browse", duration?, query?, sessionId, context}`
+    - **Batch Interactions**: `POST /api/v1/interactions/batch` for bulk uploads with validation and deduplication
+    - **Interaction History**: `GET /api/v1/users/{userId}/interactions` with pagination, filtering by type/date
+    - **Privacy Controls**: Respect user privacy settings, data retention policies (GDPR compliance)
+  - **Real-Time Profile Updates**:
+    - **Preference Vector Calculation**: Weighted average of interacted item embeddings, decay older interactions (exponential decay with 30-day half-life)
+    - **Behavioral Pattern Analysis**: Track interaction frequency, time-of-day patterns, session duration, category preferences
+    - **Profile Aggregation**: Update user profiles every 5 minutes or after 10 new interactions (whichever comes first)
+    - **Vector Normalization**: L2 normalize preference vectors, handle cold start with zero vectors
+    - **Incremental Updates**: Use running averages to avoid recomputing entire profile on each interaction
+  - **Neo4j Relationship Management**:
+    - **Relationship Creation**: Create `(:User)-[:RATED {rating, timestamp, confidence}]->(:Content)` relationships
+    - **Interaction Types**: Support RATED, VIEWED, INTERACTED_WITH, ABANDONED relationships with type-specific properties
+    - **User Similarity**: Calculate and store `(:User)-[:SIMILAR_TO {score, basis, computed_at}]->(:User)` relationships
+    - **Content Similarity**: Maintain `(:Content)-[:SIMILAR_TO {score, algorithm, computed_at}]->(:Content)` relationships
+    - **Batch Updates**: Process relationship updates in batches of 100 to optimize Neo4j performance
+  - **Profile Synchronization**:
+    - **PostgreSQL Storage**: Store user profiles with preference vectors, explicit preferences, behavior patterns
+    - **Neo4j Storage**: Store graph relationships and computed similarities
+    - **Sync Strategy**: Update PostgreSQL immediately, sync to Neo4j every 10 minutes via background job
+    - **Consistency Checks**: Validate data consistency between systems, alert on discrepancies
+    - **Conflict Resolution**: PostgreSQL as source of truth for user data, Neo4j for relationships
+  - **Performance Optimization**:
+    - **Connection Pooling**: Use PgBouncer for PostgreSQL, connection pooling for Neo4j (max 10 connections)
+    - **Caching**: Cache user profiles in Redis-hot for 1 hour, invalidate on profile updates
+    - **Async Processing**: Use Go channels for non-critical updates (similarity calculations, analytics)
+  - **Testing**: Unit tests for profile calculations, integration tests for database sync, load tests for concurrent updates
+  - _Requirements: 2.1, 2.2, 2.3, 2.4, 8.1_
+
+- [x] 5. Core Recommendation Algorithms
+  - **Semantic Search Algorithm**:
+    - Use pgvector `<=>` operator for cosine similarity with query: `SELECT content_id, 1 - (embedding <=> $1) as similarity FROM content_items ORDER BY embedding <=> $1 LIMIT 100`
+    - Implement metadata filtering (content type, categories, active status) in same query
+    - Add similarity threshold filtering (default 0.7) and result scoring
+    - Cache frequent queries in Redis-warm with 30min TTL
+  - **Collaborative Filtering Algorithm**:
+    - **User Similarity**: Implement Pearson correlation using Neo4j Cypher with shared ratings (minimum 3 items)
+    - **Recommendation Generation**: Weighted average of similar users' ratings, exclude items user has already interacted with
+    - **Cold Start**: Handle new users with popularity-based recommendations
+    - **Performance**: Limit to top 50 similar users, cache user similarities for 1 hour
+  - **Personalized PageRank Algorithm**:
+    - Use Neo4j GDS library: `CALL gds.pageRank.stream()` with user-centric graph projection
+    - Create dynamic subgraphs including user + similar users + their interactions
+    - Configure damping factor (0.85), max iterations (20), convergence threshold (0.0001)
+    - Weight edges based on interaction type: RATED (rating/5.0), VIEWED (progress/100), INTERACTED_WITH (0.5)
+  - **Graph Signal Analysis**:
+    - **Community Detection**: Use `gds.louvain.stream()` to find user communities, cache results for 2 hours
+    - **Item Similarity**: Calculate Jaccard similarity for items with shared users (minimum 3 users)
+    - **User Clustering**: Group users by interaction patterns and preferences
+    - **Signal Propagation**: Implement graph-based recommendation spreading through user networks
+  - **Algorithm Integration**: Each algorithm returns `[]ScoredItem` with ItemID, Score, Algorithm, Confidence
+  - **Testing**: Create synthetic datasets with known patterns, validate algorithm outputs against expected results
+  - _Requirements: 3.1, 3.2_
+
+- [x] 6. Recommendation Orchestration and Ranking
+  - **Recommendation Orchestrator**:
+    - **Strategy Selection**: Context-aware algorithm selection based on user profile completeness, interaction history, content availability
+    - **Algorithm Weights**: Configurable weights (semantic: 0.4, collaborative: 0.3, pagerank: 0.3) with A/B testing support
+    - **User Context Analysis**: New users (< 5 interactions) → popularity-based, active users → full algorithm suite, inactive users → trending items
+    - **Fallback Chain**: Primary algorithms → cached recommendations → popularity-based → random (with quality filter)
+    - **Request Routing**: Route requests to appropriate algorithm combinations based on user tier and system load
+  - **Result Combination Logic**:
+    - **Score Normalization**: Normalize algorithm scores to [0,1] range using min-max scaling per algorithm
+    - **Weighted Combination**: `final_score = Σ(algorithm_weight * normalized_score * confidence)`
+    - **Deduplication**: Remove duplicates by item ID, keep highest-scored version, merge explanation sources
+    - **Score Calibration**: Apply sigmoid function to final scores for better distribution
+    - **Diversity Injection**: Reserve 20% of slots for diversity algorithms before final ranking
+  - **ML-Based Ranking Service**:
+    - **Feature Engineering**: Combine content features (categories, quality_score), user features (preference_vector, behavior_patterns), context features (time_of_day, session_length)
+    - **Ranking Model**: Implement Learning-to-Rank using gradient boosting (XGBoost-style) with pairwise loss
+    - **Feature Vector**: `[content_similarity, user_item_affinity, popularity_score, recency_score, diversity_score, algorithm_confidence]`
+    - **Model Training**: Train on historical click-through data, update weekly with new interaction data
+    - **Confidence Scoring**: Calculate confidence based on feature strength, model certainty, historical performance
+  - **Performance Optimization**:
+    - **Parallel Execution**: Run algorithms concurrently using goroutines, combine results when all complete
+    - **Timeout Handling**: 1.5s timeout per algorithm, use partial results if some algorithms timeout
+    - **Caching**: Cache orchestration results in Redis-warm for 15 minutes with user-specific keys
+    - **Load Balancing**: Distribute algorithm execution across available resources
+  - **Fallback Mechanisms**:
+    - **New User Fallback**: Trending items (last 7 days), popular in user's demographic, category-based recommendations
+    - **Cold Start Content**: Recently added items with high quality scores, items popular among similar new users
+    - **System Failure Fallback**: Cached recommendations → popularity-based → random high-quality items
+    - **Graceful Degradation**: Return partial results with lower confidence scores when some components fail
+  - **Testing**: Unit tests for score combination, integration tests for algorithm orchestration, A/B testing framework for strategy evaluation
+  - _Requirements: 3.2, 3.3, 3.5, 10.4_
+
+- [x] 7. Diversity Filters and Explanation Service
+  - **Intra-List Diversity Filter**:
+    - Implement greedy algorithm: start with highest-scored item, iteratively add items that maximize `relevance_score * (1 - diversity_weight) + (1 - avg_similarity) * diversity_weight`
+    - Calculate item similarity using category overlap (Jaccard) + embedding cosine similarity (if available)
+    - Configurable diversity weight (default 0.3), maximum similarity threshold (0.8)
+  - **Category Diversity Filter**:
+    - Enforce maximum items per category (default 3), with category priority weighting
+    - Implement category balancing: ensure representation from user's preferred categories
+    - Handle hierarchical categories (electronics > smartphones > android)
+  - **Serendipity Filter**:
+    - Identify "unexpected" items: from categories user hasn't explored, but liked by similar users
+    - Inject serendipitous items at strategic positions (3rd, 7th, 12th positions)
+    - Calculate unexpectedness score: `similar_user_likes * avg_rating * (1 - category_familiarity)`
+    - Configurable serendipity ratio (default 15% of recommendations)
+  - **Temporal Diversity Filter**:
+    - Track user's recent interactions (last 7 days) and reduce recommendations for highly similar items
+    - Implement recency decay: `similarity_penalty = base_similarity * exp(-days_since_interaction / decay_factor)`
+    - Maximum similar items to recent interactions (default 2 out of 10 recommendations)
+  - **Explanation Service**:
+    - **Content-Based**: "Because you liked [similar_item] and both are [shared_categories]" with similarity scores
+    - **Collaborative**: "Users who liked [shared_items] also rated this [avg_rating]/5" with user count
+    - **Graph-Based**: "This connects to [item] through [path_description]" with connection strength
+    - **Popularity-Based**: "Highly rated by [user_count] users ([avg_rating]/5 stars)" or "Trending recently"
+  - **Explanation Selection**: Choose explanation with highest confidence, fallback to generic explanations
+  - **Confidence Scoring**: Based on evidence strength (number of similar items, user overlap, rating counts)
+  - **Testing**: Validate diversity metrics (intra-list diversity, category distribution), explanation accuracy with known scenarios
+  - _Requirements: 3.4, 7.3, 7.5, 10.5_
+
+- [x] 8. API Layer and External Integrations
+  - **REST API Implementation**:
+    - **Core Endpoints**: 
+      - `GET /api/v1/recommendations/{userId}?count=10&context=home&explain=true` - Get personalized recommendations
+      - `POST /api/v1/recommendations/batch` - Bulk recommendations for multiple users
+      - `GET /api/v1/recommendations/{userId}/similar/{itemId}` - Item-based recommendations
+      - `POST /api/v1/feedback` - Record user feedback on recommendations
+    - **Request/Response Handling**: JSON serialization with proper HTTP status codes, request validation middleware
+    - **Pagination**: Cursor-based pagination for large result sets, include `next_cursor` and `has_more` fields
+    - **Error Handling**: Structured error responses with error codes, user-friendly messages, debug information (dev mode only)
+  - **GraphQL API Implementation**:
+    - **Schema Definition**: Types for User, Content, Recommendation, Interaction with proper relationships
+    - **Queries**: `recommendations(userId: ID!, filters: RecommendationFilters, pagination: PaginationInput)`
+    - **Mutations**: `recordInteraction(input: InteractionInput!)`, `updateUserPreferences(userId: ID!, preferences: PreferencesInput!)`
+    - **Subscriptions**: `recommendationUpdates(userId: ID!)` for real-time recommendation changes
+    - **DataLoader**: Implement batching and caching for N+1 query prevention
+    - **Query Complexity**: Limit query depth (max 10), complexity scoring to prevent expensive queries
+  - **External System Plugin Architecture**:
+    - **Plugin Manager**: Dynamic plugin loading, configuration management, health monitoring
+    - **Plugin Interface**: Standardized interface with lifecycle methods (Initialize, Process, Cleanup, HealthCheck)
+    - **Data Enrichment Pipeline**: Async enrichment using goroutine workers, timeout handling (5s per plugin)
+    - **Fallback Strategy**: Continue with cached/default data when plugins fail, log failures for monitoring
+    - **Plugin Configuration**: YAML-based plugin configs with validation, environment variable support
+  - **API Versioning and Documentation**:
+    - **Versioning Strategy**: URL-based versioning (`/api/v1/`, `/api/v2/`), maintain backward compatibility for 2 versions
+    - **OpenAPI Documentation**: Auto-generated Swagger docs at `/docs`, include examples and error codes
+    - **GraphQL Playground**: Interactive GraphQL explorer at `/graphql`, include schema documentation
+    - **SDK Generation**: Auto-generate client SDKs for popular languages (Go, Python, JavaScript)
+  - **Security and Rate Limiting**:
+    - **Authentication**: JWT token validation middleware, support for API keys and user tokens
+    - **Rate Limiting**: Redis-based sliding window, different limits per user tier (free: 100/hour, premium: 1000/hour)
+    - **CORS**: Configurable CORS policies, support for multiple origins
+    - **Input Validation**: JSON schema validation, SQL injection prevention, XSS protection
+  - **Performance Optimization**:
+    - **Response Caching**: Cache GET responses in Redis for 5 minutes, invalidate on data changes
+    - **Compression**: Gzip compression for responses > 1KB
+    - **Connection Pooling**: HTTP/2 support, keep-alive connections
+    - **Monitoring**: Request/response logging, performance metrics, error tracking
+  - **Testing**: Unit tests for all endpoints, integration tests with mock external systems, load testing with realistic traffic patterns
+  - _Requirements: 7.1, 7.2, 7.4, 4.1, 4.2, 4.3_
+
+- [x] 9. Real-Time Learning and Feedback Integration
+  - **Real-Time Feedback Processing**:
+    - **Immediate Updates**: Process explicit feedback (ratings, likes) within 100ms, update user preference vectors
+    - **Batch Processing**: Aggregate implicit feedback (clicks, views) every 5 minutes for efficiency
+    - **Feedback Validation**: Validate feedback authenticity (rate limiting, user verification, spam detection)
+    - **Preference Vector Updates**: Incremental updates using exponential moving average: `new_vector = α * feedback_vector + (1-α) * old_vector`
+    - **Cache Invalidation**: Immediately invalidate user-specific recommendation caches on explicit feedback
+  - **Dynamic Algorithm Weight Adjustment**:
+    - **Performance Tracking**: Monitor algorithm performance metrics (CTR, conversion rate, user satisfaction) per user segment
+    - **Weight Optimization**: Use multi-armed bandit approach (Thompson Sampling) to adjust algorithm weights
+    - **Segment-Based Weights**: Different weights for user segments (new users, power users, inactive users)
+    - **Performance Windows**: Evaluate performance over sliding 7-day windows, adjust weights weekly
+    - **Minimum Performance Thresholds**: Disable algorithms that consistently underperform (CTR < 0.5%)
+  - **A/B Testing Framework**:
+    - **Experiment Management**: Create, manage, and monitor A/B tests for algorithm versions, UI changes, ranking models
+    - **User Assignment**: Consistent user assignment to test groups using hash-based bucketing
+    - **Statistical Significance**: Implement statistical tests (t-test, chi-square) with proper sample size calculations
+    - **Experiment Configuration**: YAML-based experiment configs with traffic allocation, success metrics, duration
+    - **Results Dashboard**: Real-time experiment results with confidence intervals, statistical significance indicators
+  - **Continuous Learning Pipeline**:
+    - **Data Collection**: Aggregate interaction data, recommendation performance, user feedback into training datasets
+    - **Feature Engineering**: Generate features for model training (user embeddings, item features, interaction patterns)
+    - **Model Retraining**: Retrain ranking models weekly using latest interaction data, validate on holdout set
+    - **Model Deployment**: Blue-green deployment for model updates, rollback capability for performance degradation
+    - **Performance Monitoring**: Monitor model performance post-deployment, alert on significant performance drops
+  - **Feedback Loop Optimization**:
+    - **Exploration vs Exploitation**: Balance between showing proven recommendations and exploring new items (ε-greedy with ε=0.1)
+    - **Cold Start Handling**: Special handling for new users and items, use content-based recommendations initially
+    - **Feedback Quality Scoring**: Weight feedback based on user reliability, interaction context, feedback consistency
+    - **Temporal Patterns**: Account for time-based preference changes, seasonal patterns, trending topics
+  - **System Architecture**:
+    - **Event Streaming**: Use Kafka for real-time feedback events, ensure exactly-once processing
+    - **Worker Pools**: Dedicated goroutine pools for different feedback types (explicit: 10 workers, implicit: 5 workers)
+    - **Database Updates**: Batch database updates for efficiency, use transactions for consistency
+    - **Monitoring**: Track feedback processing latency, throughput, error rates, model performance metrics
+  - **Testing**: Unit tests for feedback processing logic, integration tests for end-to-end learning pipeline, A/B testing validation
+  - _Requirements: 8.1, 8.2, 8.3, 8.5_
+
+- [x] 10. Monitoring, Analytics, and Frontend
+  - **Business Metrics Collection**:
+    - **Key Metrics**: Click-through rate (CTR), conversion rate, user engagement time, recommendation diversity, user satisfaction scores
+    - **Data Pipeline**: Stream metrics to PostgreSQL via Kafka, aggregate hourly/daily summaries for fast queries
+    - **Metric Calculation**: 
+      - CTR = (clicks / impressions) * 100, calculated per algorithm, user segment, content category
+      - Conversion rate = (conversions / clicks) * 100, tracked with attribution windows (1-day, 7-day)
+      - Engagement = average session duration, pages per session, return visit rate
+    - **Real-Time Dashboards**: Update metrics every 5 minutes, show trends and comparisons
+    - **Cohort Analysis**: Track user behavior changes over time, measure recommendation impact on user retention
+  - **Prometheus Monitoring Setup**:
+    - **Custom Metrics**: 
+      - `recommendation_requests_total` (counter by algorithm, user_tier)
+      - `recommendation_latency_seconds` (histogram with buckets: 0.1, 0.5, 1.0, 2.0, 5.0)
+      - `algorithm_performance_score` (gauge by algorithm)
+      - `cache_hit_ratio` (gauge by cache_type)
+      - `database_connection_pool_usage` (gauge)
+    - **System Metrics**: CPU usage, memory consumption, goroutine count, GC pause times
+    - **Alerting Rules**: 
+      - High error rate (> 5% for 5 minutes)
+      - High latency (p95 > 2s for 10 minutes)
+      - Low cache hit rate (< 70% for 15 minutes)
+      - Database connection pool exhaustion (> 90% for 5 minutes)
+    - **Grafana Integration**: Pre-built dashboards for system health, business metrics, algorithm performance
+  - **Node.js Frontend Implementation**:
+    - **Express Server**: Simple server with static file serving, API proxy to Go backend
+    - **Recommendation Display**: 
+      - Grid layout with item cards (image, title, price, rating)
+      - Explanation tooltips showing why items were recommended
+      - User feedback buttons (like/dislike, rating stars)
+      - Infinite scroll for additional recommendations
+    - **User Interface**: 
+      - Search functionality with real-time suggestions
+      - Category filtering and sorting options
+      - User profile page with preference settings
+      - Recommendation history and feedback management
+    - **Real-Time Updates**: WebSocket connection for live recommendation updates, notification system
+  - **Admin Dashboard**:
+    - **System Health**: Real-time status of all services, database connections, cache performance
+    - **Business Analytics**: 
+      - Revenue impact of recommendations
+      - A/B test results with statistical significance
+      - User engagement metrics and trends
+      - Algorithm performance comparison
+    - **Content Management**: 
+      - Content ingestion status and error logs
+      - Content quality scores and recommendations
+      - Category management and taxonomy updates
+    - **User Management**: 
+      - User segmentation and behavior analysis
+      - Recommendation personalization settings
+      - Privacy and data retention controls
+    - **System Configuration**: 
+      - Algorithm weight adjustments
+      - Feature flag management
+      - Plugin configuration and monitoring
+  - **Performance Optimization**:
+    - **Frontend Caching**: Browser caching for static assets, service worker for offline functionality
+    - **API Optimization**: Response compression, CDN integration for images
+    - **Database Optimization**: Query optimization, connection pooling, read replicas for analytics
+    - **Monitoring Overhead**: Minimize monitoring impact on system performance (< 5% overhead)
+  - **Testing**: Frontend unit tests with Jest, integration tests for API endpoints, end-to-end tests with Cypress, load testing for monitoring system
+  - _Requirements: 9.1, 9.3, 9.4, 9.5, 7.1_
+
+- [x] 11. Data Contracts and API Specifications
+  - **OpenAPI/Swagger Specification**:
+    - Document all REST endpoints: `POST /api/v1/content`, `POST /api/v1/interactions`, `GET /api/v1/recommendations/{userId}`
+    - Define request/response schemas with examples, validation rules, and error codes
+    - Include authentication requirements (JWT Bearer tokens), rate limiting headers
+    - Generate interactive API documentation accessible at `/docs`
+  - **GraphQL Schema Documentation**:
+    - Define complete schema with types: `User`, `Content`, `Recommendation`, `Interaction`, `Explanation`
+    - Document all queries: `recommendations(userId: ID!, count: Int, filters: RecommendationFilters)`
+    - Add mutations: `addInteraction`, `rateContent`, `updateUserProfile`
+    - Include subscriptions for real-time updates: `recommendationUpdates(userId: ID!)`
+  - **Data Model Contracts**:
+    - **ContentItem**: `{id, type, title, description, imageUrls, metadata, categories, createdAt, updatedAt}`
+    - **UserInteraction**: `{userId, itemId, interactionType, value, timestamp, sessionId, context}`
+    - **Recommendation**: `{itemId, score, algorithm, explanation, confidence, position}`
+    - **UserProfile**: `{userId, preferenceVector, explicitPreferences, behaviorPatterns, demographics}`
+  - **Validation Schemas**:
+    - JSON Schema validation for all input data with detailed error messages
+    - Content validation: required fields, URL format validation, category enum validation
+    - Interaction validation: user/item existence, value ranges, timestamp format
+  - **Error Response Format**:
+    - Standardized error structure: `{error: {code, message, details, timestamp, requestId}, fallback?: {used, strategy, confidence}}`
+    - HTTP status codes mapping: 400 (validation), 401 (auth), 429 (rate limit), 500 (server error)
+    - Detailed error codes: `INVALID_CONTENT_TYPE`, `USER_NOT_FOUND`, `EMBEDDING_GENERATION_FAILED`
+  - **Contract Testing**:
+    - Implement Pact-style contract tests to ensure API compatibility
+    - Automated tests that validate request/response schemas against OpenAPI spec
+    - Integration tests that verify GraphQL schema matches implementation
+  - _Requirements: 7.1, 7.2, 7.4, 1.1, 2.1_
+
+- [-] 12. Plugin Development Framework and Tutorial
+  - **Plugin Interface Definition**:
+    - Core interface: `type ExternalSystemPlugin interface { Name() string; Connect(config) error; EnrichUserProfile(userID) (*UserEnrichment, error); IsHealthy() bool }`
+    - Plugin lifecycle: Initialize → Connect → Process → Cleanup with proper error handling
+    - Data structures: `UserEnrichment{Demographics, Interests, SocialConnections, Confidence}`
+    - Configuration schema: JSON-based plugin config with validation
+  - **Plugin Development Tutorial**:
+    - **Step 1**: Plugin structure and boilerplate code generation
+    - **Step 2**: Implementing the plugin interface with proper error handling
+    - **Step 3**: Configuration management and environment variables
+    - **Step 4**: API client implementation with retry logic and rate limiting
+    - **Step 5**: Data transformation and enrichment logic
+    - **Step 6**: Testing plugin with mock data and integration tests
+    - **Step 7**: Deployment and monitoring considerations
+  - **Example Plugin Implementations**:
+    - **Salesforce CRM Plugin**: Fetch user demographics, purchase history, lead scores using Salesforce REST API
+    - **Facebook Social Plugin**: Get user interests, social connections, engagement patterns using Graph API
+    - **Google Analytics Plugin**: Extract user behavior patterns, session data, conversion funnels
+    - **Weather API Plugin**: Contextual recommendations based on weather conditions and location
+  - **Plugin Testing Framework**:
+    - Mock external API responses for consistent testing
+    - Plugin validation tools: interface compliance, performance benchmarks, error handling
+    - Integration test suite: plugin loading, configuration validation, data enrichment accuracy
+    - Performance testing: latency, throughput, memory usage under load
+  - **Plugin Registry System**:
+    - Plugin discovery mechanism: scan plugin directory, validate plugin metadata
+    - Version management: semantic versioning, compatibility checks, upgrade paths
+    - Configuration UI: web interface for plugin installation, configuration, monitoring
+    - Plugin marketplace concept: community plugins, ratings, documentation
+  - **Developer Documentation**:
+    - Complete API reference with code examples in Go
+    - Best practices: error handling, logging, performance optimization, security
+    - Troubleshooting guide: common issues, debugging techniques, logging patterns
+    - Plugin deployment guide: Docker integration, environment setup, monitoring
+  - _Requirements: 4.1, 4.2, 4.3, 10.1_
+
+- [ ] 13. Comprehensive Documentation and Tutorials
+  - **Getting Started Tutorial** (`docs/getting-started.md`):
+    - **Quick Start**: 5-minute setup with Docker Compose, sample data loading, first recommendation request
+    - **Architecture Overview**: System components, data flow, key concepts with diagrams
+    - **Basic Usage**: Content ingestion, user interaction tracking, recommendation retrieval with curl examples
+    - **Configuration Guide**: Environment variables, config files, feature flags with explanations
+  - **Developer Documentation** (`docs/developer/`):
+    - **API Reference**: Complete REST and GraphQL API documentation with examples
+    - **Database Schema**: Entity relationship diagrams, table descriptions, index strategies
+    - **Algorithm Guide**: Detailed explanation of each recommendation algorithm, parameters, use cases
+    - **Plugin Development**: Step-by-step guide for creating custom plugins with code templates
+    - **Testing Guide**: Unit testing, integration testing, performance testing best practices
+  - **Deployment Documentation** (`docs/deployment/`):
+    - **Production Setup**: Docker production configuration, environment setup, security considerations
+    - **Scaling Guide**: Horizontal scaling strategies, load balancing, database optimization
+    - **Monitoring Setup**: Prometheus/Grafana configuration, alerting rules, dashboard templates
+    - **Troubleshooting**: Common issues, debugging techniques, performance optimization tips
+  - **User Guides** (`docs/user/`):
+    - **Admin Guide**: System administration, user management, content management, analytics interpretation
+    - **Business Guide**: Understanding recommendation metrics, A/B testing, ROI measurement
+    - **Integration Guide**: Integrating with existing systems, data migration, API best practices
+  - **Code Examples and Samples** (`examples/`):
+    - **Sample Applications**: Complete example applications in different languages (Go, Python, JavaScript)
+    - **Plugin Examples**: Working examples of CRM, social media, analytics plugins
+    - **Configuration Templates**: Production-ready configuration files for different deployment scenarios
+    - **Data Samples**: Sample datasets for testing and development
+  - **Interactive Tutorials** (`docs/tutorials/`):
+    - **Hands-on Walkthrough**: Interactive tutorial with real data and step-by-step instructions
+    - **Use Case Scenarios**: E-commerce, media streaming, content discovery specific tutorials
+    - **Advanced Features**: Machine learning customization, algorithm tuning, performance optimization
+  - _Requirements: All requirements (documentation and usability)_
+
+- [ ] 14. Integration Testing and Production Readiness
+  - Create end-to-end integration tests for complete user journeys
+  - Implement performance benchmarking and optimization
+  - Add load testing scenarios and database query tuning
+  - Create production Docker configuration and deployment scripts
+  - Write operational documentation and monitoring runbooks
+  - _Requirements: 3.5, 5.5, 5.6, 9.2, 9.4_

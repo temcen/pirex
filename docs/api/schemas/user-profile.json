@@ -1,0 +1,270 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://api.recommendations.example.com/schemas/user-profile.json",
+  "title": "User Profile",
+  "description": "Schema for user profile data",
+  "type": "object",
+  "properties": {
+    "userId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique user identifier"
+    },
+    "preferenceVector": {
+      "type": "array",
+      "items": {
+        "type": "number",
+        "minimum": -1,
+        "maximum": 1
+      },
+      "minItems": 384,
+      "maxItems": 1024,
+      "description": "User preference embedding vector (normalized)"
+    },
+    "explicitPreferences": {
+      "type": "object",
+      "properties": {
+        "categories": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]+$",
+            "maxLength": 50
+          },
+          "maxItems": 20,
+          "uniqueItems": true,
+          "description": "Preferred categories"
+        },
+        "brands": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "maxItems": 50,
+          "uniqueItems": true,
+          "description": "Preferred brands"
+        },
+        "priceRange": {
+          "type": "object",
+          "properties": {
+            "min": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000000
+            },
+            "max": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000000
+            }
+          },
+          "additionalProperties": false,
+          "description": "Preferred price range"
+        },
+        "excludeCategories": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]+$",
+            "maxLength": 50
+          },
+          "maxItems": 20,
+          "uniqueItems": true,
+          "description": "Categories to exclude from recommendations"
+        }
+      },
+      "additionalProperties": false
+    },
+    "behaviorPatterns": {
+      "type": "object",
+      "properties": {
+        "avgSessionDuration": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 86400,
+          "description": "Average session duration in seconds"
+        },
+        "preferredTimeOfDay": {
+          "type": "string",
+          "enum": ["morning", "afternoon", "evening", "night"],
+          "description": "Preferred time of day for activity"
+        },
+        "devicePreference": {
+          "type": "string",
+          "enum": ["mobile", "tablet", "desktop", "tv", "watch"],
+          "description": "Preferred device type"
+        },
+        "interactionFrequency": {
+          "type": "string",
+          "enum": ["low", "medium", "high"],
+          "description": "How frequently user interacts with content"
+        },
+        "browsingStyle": {
+          "type": "string",
+          "enum": ["explorer", "focused", "impulse", "researcher"],
+          "description": "User's browsing behavior pattern"
+        },
+        "avgRating": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "User's average rating across all interactions"
+        },
+        "ratingVariance": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 4,
+          "description": "Variance in user's ratings"
+        }
+      },
+      "additionalProperties": false
+    },
+    "demographics": {
+      "type": "object",
+      "properties": {
+        "ageGroup": {
+          "type": "string",
+          "enum": ["18-24", "25-34", "35-44", "45-54", "55-64", "65+"],
+          "description": "Age group"
+        },
+        "location": {
+          "type": "object",
+          "properties": {
+            "country": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}$",
+              "description": "ISO 3166-1 alpha-2 country code"
+            },
+            "region": {
+              "type": "string",
+              "maxLength": 100,
+              "description": "State/province/region"
+            },
+            "city": {
+              "type": "string",
+              "maxLength": 100,
+              "description": "City name"
+            },
+            "timezone": {
+              "type": "string",
+              "pattern": "^[A-Za-z_/]+$",
+              "description": "IANA timezone identifier"
+            }
+          },
+          "additionalProperties": false
+        },
+        "interests": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 50
+          },
+          "maxItems": 50,
+          "uniqueItems": true,
+          "description": "User interests and hobbies"
+        },
+        "language": {
+          "type": "string",
+          "pattern": "^[a-z]{2}(-[A-Z]{2})?$",
+          "description": "Preferred language (ISO 639-1 with optional country code)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "privacySettings": {
+      "type": "object",
+      "properties": {
+        "dataRetentionDays": {
+          "type": "integer",
+          "minimum": 30,
+          "maximum": 3650,
+          "default": 365,
+          "description": "How long to retain user data in days"
+        },
+        "allowPersonalization": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to use data for personalization"
+        },
+        "allowExternalEnrichment": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether to enrich profile with external data"
+        },
+        "shareWithPartners": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether to share anonymized data with partners"
+        }
+      },
+      "additionalProperties": false
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the profile was created"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the profile was last updated"
+    }
+  },
+  "required": ["userId"],
+  "additionalProperties": false,
+  "examples": [
+    {
+      "userId": "550e8400-e29b-41d4-a716-446655440000",
+      "preferenceVector": [0.1, -0.3, 0.8, 0.2],
+      "explicitPreferences": {
+        "categories": ["electronics", "books", "sports"],
+        "brands": ["Apple", "Nike", "Sony"],
+        "priceRange": {
+          "min": 50,
+          "max": 500
+        }
+      },
+      "behaviorPatterns": {
+        "avgSessionDuration": 1200,
+        "preferredTimeOfDay": "evening",
+        "devicePreference": "mobile",
+        "interactionFrequency": "medium",
+        "browsingStyle": "explorer",
+        "avgRating": 4.2,
+        "ratingVariance": 0.8
+      },
+      "demographics": {
+        "ageGroup": "25-34",
+        "location": {
+          "country": "US",
+          "region": "California",
+          "city": "San Francisco",
+          "timezone": "America/Los_Angeles"
+        },
+        "interests": ["technology", "fitness", "reading"],
+        "language": "en-US"
+      },
+      "privacySettings": {
+        "dataRetentionDays": 365,
+        "allowPersonalization": true,
+        "allowExternalEnrichment": false,
+        "shareWithPartners": false
+      },
+      "createdAt": "2024-01-01T00:00:00Z",
+      "updatedAt": "2024-01-15T10:30:00Z"
+    }
+  ],
+  "errorMessage": {
+    "properties": {
+      "userId": "User ID must be a valid UUID",
+      "preferenceVector": "Preference vector must be an array of numbers between -1 and 1",
+      "explicitPreferences": "Explicit preferences must be a valid object with categories, brands, and price range",
+      "behaviorPatterns": "Behavior patterns must contain valid behavioral data",
+      "demographics": "Demographics must contain valid demographic information"
+    },
+    "required": {
+      "userId": "User ID is required"
+    }
+  }
+}
