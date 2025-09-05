@@ -2,426 +2,534 @@ package plugins
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v3"
 )
 
-// PluginManager manages external system plugins
-type PluginManager struct {
-	plugins  map[string]ExternalSystemPlugin
-	configs  map[string]*PluginConfig
-	statuses map[string]*PluginStatus
-	redis    *redis.Client
-	logger   *logrus.Logger
-	mu       sync.RWMutex
-
-	// Worker pool for async processing
-	workerCount int
-	jobQueue    chan *EnrichmentJob
-	workers     []*Worker
-	stopChan    chan struct{}
+// Manager handles plugin lifecycle and orchestration
+type Manager struct {
+	plugins       map[string]ExternalSystemPlugin
+	configs       map[string]map[string]interface{}
+	cache         *redis.Client
+	logger        *logrus.Logger
+	pluginDir     string
+	cacheTTL      time.Duration
+	timeout       time.Duration
+	maxRetries    int
+	retryDelay    time.Duration
+	mu            sync.RWMutex
+	healthChecker *HealthChecker
 }
 
-// EnrichmentJob represents a user enrichment job
-type EnrichmentJob struct {
-	UserID     uuid.UUID
-	Plugins    []string
-	Timeout    time.Duration
-	ResultChan chan *EnrichmentResult
+// ManagerConfig contains configuration for the plugin manager
+type ManagerConfig struct {
+	PluginDir   string        `json:"plugin_dir"`
+	CacheTTL    time.Duration `json:"cache_ttl"`
+	Timeout     time.Duration `json:"timeout"`
+	MaxRetries  int           `json:"max_retries"`
+	RetryDelay  time.Duration `json:"retry_delay"`
+	RedisClient *redis.Client
+	Logger      *logrus.Logger
 }
 
-// EnrichmentResult represents the result of user enrichment
-type EnrichmentResult struct {
-	UserID      uuid.UUID
-	Enrichments []*UserEnrichment
-	Errors      map[string]error
-	ProcessTime time.Duration
-}
-
-// Worker processes enrichment jobs
-type Worker struct {
-	id      int
-	manager *PluginManager
-	jobChan chan *EnrichmentJob
-	quit    chan struct{}
-}
-
-// NewPluginManager creates a new plugin manager
-func NewPluginManager(redis *redis.Client, logger *logrus.Logger, workerCount int) *PluginManager {
-	return &PluginManager{
-		plugins:     make(map[string]ExternalSystemPlugin),
-		configs:     make(map[string]*PluginConfig),
-		statuses:    make(map[string]*PluginStatus),
-		redis:       redis,
-		logger:      logger,
-		workerCount: workerCount,
-		jobQueue:    make(chan *EnrichmentJob, 100),
-		stopChan:    make(chan struct{}),
-	}
-}
-
-// LoadConfig loads plugin configurations from YAML
-func (pm *PluginManager) LoadConfig(configData []byte) error {
-	var configs []PluginConfig
-	if err := yaml.Unmarshal(configData, &configs); err != nil {
-		return fmt.Errorf("failed to parse plugin config: %w", err)
+// NewManager creates a new plugin manager
+func NewManager(config *ManagerConfig) *Manager {
+	if config.Logger == nil {
+		config.Logger = logrus.New()
 	}
 
-	pm.mu.Lock()
-	defer pm.mu.Unlock()
-
-	for _, config := range configs {
-		pm.configs[config.Name] = &config
-		pm.statuses[config.Name] = &PluginStatus{
-			Name:      config.Name,
-			Healthy:   false,
-			LastCheck: time.Now(),
-		}
+	manager := &Manager{
+		plugins:       make(map[string]ExternalSystemPlugin),
+		configs:       make(map[string]map[string]interface{}),
+		cache:         config.RedisClient,
+		logger:        config.Logger,
+		pluginDir:     config.PluginDir,
+		cacheTTL:      config.CacheTTL,
+		timeout:       config.Timeout,
+		maxRetries:    config.MaxRetries,
+		retryDelay:    config.RetryDelay,
+		healthChecker: NewHealthChecker(config.Logger),
 	}
 
-	return nil
+	// Set defaults
+	if manager.cacheTTL == 0 {
+		manager.cacheTTL = 30 * time.Minute
+	}
+	if manager.timeout == 0 {
+		manager.timeout = 10 * time.Second
+	}
+	if manager.maxRetries == 0 {
+		manager.maxRetries = 3
+	}
+	if manager.retryDelay == 0 {
+		manager.retryDelay = time.Second
+	}
+
+	return manager
 }
 
-// RegisterPlugin registers a plugin with the manager
-func (pm *PluginManager) RegisterPlugin(plugin ExternalSystemPlugin) error {
-	pm.mu.Lock()
-	defer pm.mu.Unlock()
-
-	name := plugin.Name()
-	config, exists := pm.configs[name]
-	if !exists {
-		return fmt.Errorf("no configuration found for plugin: %s", name)
-	}
-
-	if !config.Enabled {
-		pm.logger.Info("Plugin is disabled", "plugin", name)
+// LoadPlugins discovers and loads all plugins from the plugin directory
+func (m *Manager) LoadPlugins() error {
+	if m.pluginDir == "" {
+		m.logger.Info("No plugin directory specified, skipping plugin loading")
 		return nil
 	}
 
-	// Initialize plugin
-	if err := plugin.Initialize(config.Config); err != nil {
-		pm.logger.Error("Failed to initialize plugin", "plugin", name, "error", err)
-		return fmt.Errorf("failed to initialize plugin %s: %w", name, err)
-	}
+	return filepath.WalkDir(m.pluginDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
 
-	pm.plugins[name] = plugin
-	pm.statuses[name].Healthy = true
-	pm.statuses[name].LastCheck = time.Now()
+		if d.IsDir() || filepath.Ext(path) != ".json" {
+			return nil
+		}
 
-	pm.logger.Info("Plugin registered successfully", "plugin", name)
-	return nil
+		return m.loadPluginConfig(path)
+	})
 }
 
-// Start starts the plugin manager and worker pool
-func (pm *PluginManager) Start() error {
-	pm.logger.Info("Starting plugin manager", "workers", pm.workerCount)
+// RegisterPlugin registers a plugin with the manager
+func (m *Manager) RegisterPlugin(plugin ExternalSystemPlugin, config map[string]interface{}) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
-	// Start workers
-	for i := 0; i < pm.workerCount; i++ {
-		worker := &Worker{
-			id:      i,
-			manager: pm,
-			jobChan: make(chan *EnrichmentJob),
-			quit:    make(chan struct{}),
-		}
-		pm.workers = append(pm.workers, worker)
-		go worker.start()
+	name := plugin.Name()
+
+	// Validate plugin metadata
+	metadata := plugin.GetMetadata()
+	if err := m.validatePluginMetadata(metadata); err != nil {
+		return fmt.Errorf("invalid plugin metadata for %s: %w", name, err)
 	}
 
-	// Start job dispatcher
-	go pm.dispatch()
-
-	// Start health check routine
-	go pm.healthCheckRoutine()
-
-	return nil
-}
-
-// Stop stops the plugin manager and all workers
-func (pm *PluginManager) Stop() error {
-	pm.logger.Info("Stopping plugin manager")
-
-	close(pm.stopChan)
-
-	// Stop all workers
-	for _, worker := range pm.workers {
-		close(worker.quit)
+	// Validate configuration
+	if err := m.validatePluginConfig(metadata.Config, config); err != nil {
+		return fmt.Errorf("invalid configuration for plugin %s: %w", name, err)
 	}
 
-	// Cleanup all plugins
-	pm.mu.RLock()
-	for name, plugin := range pm.plugins {
-		if err := plugin.Cleanup(); err != nil {
-			pm.logger.Error("Failed to cleanup plugin", "plugin", name, "error", err)
-		}
+	// Connect plugin
+	if err := plugin.Connect(config); err != nil {
+		return fmt.Errorf("failed to connect plugin %s: %w", name, err)
 	}
-	pm.mu.RUnlock()
+
+	m.plugins[name] = plugin
+	m.configs[name] = config
+
+	// Start health monitoring
+	m.healthChecker.AddPlugin(plugin)
+
+	m.logger.WithFields(logrus.Fields{
+		"plugin":  name,
+		"version": metadata.Version,
+	}).Info("Plugin registered successfully")
 
 	return nil
 }
 
-// EnrichUser enriches user data using configured plugins
-func (pm *PluginManager) EnrichUser(ctx context.Context, userID uuid.UUID, pluginNames []string) (*EnrichmentResult, error) {
-	// If no specific plugins requested, use all enabled plugins
-	if len(pluginNames) == 0 {
-		pm.mu.RLock()
-		for name, config := range pm.configs {
-			if config.Enabled {
-				pluginNames = append(pluginNames, name)
-			}
-		}
-		pm.mu.RUnlock()
+// UnregisterPlugin removes a plugin from the manager
+func (m *Manager) UnregisterPlugin(name string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	plugin, exists := m.plugins[name]
+	if !exists {
+		return fmt.Errorf("plugin %s not found", name)
 	}
+
+	// Cleanup plugin
+	if err := plugin.Cleanup(); err != nil {
+		m.logger.WithError(err).Warn("Error during plugin cleanup")
+	}
+
+	// Remove from health checker
+	m.healthChecker.RemovePlugin(name)
+
+	delete(m.plugins, name)
+	delete(m.configs, name)
+
+	m.logger.WithField("plugin", name).Info("Plugin unregistered")
+
+	return nil
+}
+
+// EnrichUserProfile enriches user profile using all available plugins
+func (m *Manager) EnrichUserProfile(userID string) (*CombinedEnrichment, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), m.timeout)
+	defer cancel()
 
 	// Check cache first
-	if cached := pm.getCachedEnrichment(ctx, userID); cached != nil {
-		pm.logger.Debug("Using cached enrichment", "user_id", userID)
+	if cached := m.getCachedEnrichment(userID); cached != nil {
 		return cached, nil
 	}
 
-	// Create enrichment job
-	job := &EnrichmentJob{
-		UserID:     userID,
-		Plugins:    pluginNames,
-		Timeout:    5 * time.Second, // Default timeout
-		ResultChan: make(chan *EnrichmentResult, 1),
+	m.mu.RLock()
+	plugins := make(map[string]ExternalSystemPlugin)
+	for name, plugin := range m.plugins {
+		plugins[name] = plugin
+	}
+	m.mu.RUnlock()
+
+	// Enrich using all plugins concurrently
+	enrichments := make(chan *PluginEnrichmentResult, len(plugins))
+
+	for name, plugin := range plugins {
+		go m.enrichWithPlugin(ctx, name, plugin, userID, enrichments)
 	}
 
-	// Submit job
-	select {
-	case pm.jobQueue <- job:
-		// Job submitted successfully
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	default:
-		return nil, fmt.Errorf("job queue is full")
-	}
-
-	// Wait for result
-	select {
-	case result := <-job.ResultChan:
-		// Cache successful result
-		if len(result.Enrichments) > 0 {
-			pm.cacheEnrichment(ctx, userID, result)
+	// Collect results
+	results := make([]*PluginEnrichmentResult, 0, len(plugins))
+	for i := 0; i < len(plugins); i++ {
+		select {
+		case result := <-enrichments:
+			results = append(results, result)
+		case <-ctx.Done():
+			m.logger.WithError(ctx.Err()).Warn("Timeout waiting for plugin enrichments")
+			break
 		}
-		return result, nil
-	case <-ctx.Done():
-		return nil, ctx.Err()
 	}
+
+	// Combine enrichments
+	combined := m.combineEnrichments(results)
+
+	// Cache result
+	m.cacheEnrichment(userID, combined)
+
+	return combined, nil
+}
+
+// EnrichWithPlugin enriches user profile using a specific plugin
+func (m *Manager) EnrichWithPlugin(pluginName, userID string) (*UserEnrichment, error) {
+	m.mu.RLock()
+	plugin, exists := m.plugins[pluginName]
+	m.mu.RUnlock()
+
+	if !exists {
+		return nil, fmt.Errorf("plugin %s not found", pluginName)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), m.timeout)
+	defer cancel()
+
+	// Check plugin health
+	if !plugin.IsHealthy() {
+		return nil, &PluginError{
+			Plugin:    pluginName,
+			Operation: "enrich",
+			Message:   "plugin is unhealthy",
+			Code:      ErrorCodeConnection,
+			Retryable: true,
+		}
+	}
+
+	// Enrich with retry logic
+	return m.enrichWithRetry(ctx, plugin, userID)
 }
 
 // GetPluginStatus returns the status of all plugins
-func (pm *PluginManager) GetPluginStatus() map[string]*PluginStatus {
-	pm.mu.RLock()
-	defer pm.mu.RUnlock()
+func (m *Manager) GetPluginStatus() map[string]*PluginHealthStatus {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 
-	status := make(map[string]*PluginStatus)
-	for name, s := range pm.statuses {
-		status[name] = &PluginStatus{
-			Name:           s.Name,
-			Healthy:        s.Healthy,
-			LastCheck:      s.LastCheck,
-			Error:          s.Error,
-			ProcessedCount: s.ProcessedCount,
-			ErrorCount:     s.ErrorCount,
+	status := make(map[string]*PluginHealthStatus)
+
+	for name, plugin := range m.plugins {
+		metadata := plugin.GetMetadata()
+		status[name] = &PluginHealthStatus{
+			Name:         name,
+			Version:      metadata.Version,
+			Healthy:      plugin.IsHealthy(),
+			LastCheck:    time.Now(),
+			Capabilities: metadata.Capabilities,
 		}
 	}
 
 	return status
 }
 
-// dispatch distributes jobs to workers
-func (pm *PluginManager) dispatch() {
-	for {
-		select {
-		case job := <-pm.jobQueue:
-			// Find available worker
-			jobHandled := false
-			for _, worker := range pm.workers {
-				select {
-				case worker.jobChan <- job:
-					jobHandled = true
-				default:
-					continue
-				}
-				if jobHandled {
-					break
-				}
-			}
-			// If no worker available, handle with fallback
-			if !jobHandled {
-				pm.handleJobFallback(job)
-			}
-		case <-pm.stopChan:
-			return
+// GetPlugin returns a specific plugin by name
+func (m *Manager) GetPlugin(name string) (ExternalSystemPlugin, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	plugin, exists := m.plugins[name]
+	return plugin, exists
+}
+
+// ListPlugins returns a list of all registered plugins
+func (m *Manager) ListPlugins() []string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	names := make([]string, 0, len(m.plugins))
+	for name := range m.plugins {
+		names = append(names, name)
+	}
+
+	return names
+}
+
+// Shutdown gracefully shuts down all plugins
+func (m *Manager) Shutdown() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	var errors []error
+
+	for name, plugin := range m.plugins {
+		if err := plugin.Cleanup(); err != nil {
+			errors = append(errors, fmt.Errorf("error cleaning up plugin %s: %w", name, err))
 		}
 	}
-}
 
-// handleJobFallback handles jobs when no workers are available
-func (pm *PluginManager) handleJobFallback(job *EnrichmentJob) {
-	result := &EnrichmentResult{
-		UserID:      job.UserID,
-		Enrichments: []*UserEnrichment{},
-		Errors:      make(map[string]error),
-		ProcessTime: 0,
+	m.healthChecker.Stop()
+
+	if len(errors) > 0 {
+		return fmt.Errorf("errors during shutdown: %v", errors)
 	}
 
-	for _, pluginName := range job.Plugins {
-		result.Errors[pluginName] = fmt.Errorf("no workers available")
-	}
-
-	select {
-	case job.ResultChan <- result:
-	default:
-	}
-}
-
-// healthCheckRoutine periodically checks plugin health
-func (pm *PluginManager) healthCheckRoutine() {
-	ticker := time.NewTicker(30 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			pm.performHealthChecks()
-		case <-pm.stopChan:
-			return
-		}
-	}
-}
-
-// performHealthChecks checks the health of all plugins
-func (pm *PluginManager) performHealthChecks() {
-	pm.mu.RLock()
-	plugins := make(map[string]ExternalSystemPlugin)
-	for name, plugin := range pm.plugins {
-		plugins[name] = plugin
-	}
-	pm.mu.RUnlock()
-
-	for name, plugin := range plugins {
-		err := plugin.HealthCheck()
-
-		pm.mu.Lock()
-		status := pm.statuses[name]
-		status.LastCheck = time.Now()
-		if err != nil {
-			status.Healthy = false
-			status.Error = err.Error()
-			pm.logger.Warn("Plugin health check failed", "plugin", name, "error", err)
-		} else {
-			status.Healthy = true
-			status.Error = ""
-		}
-		pm.mu.Unlock()
-	}
-}
-
-// getCachedEnrichment retrieves cached enrichment data
-func (pm *PluginManager) getCachedEnrichment(ctx context.Context, userID uuid.UUID) *EnrichmentResult {
-	if pm.redis == nil {
-		return nil
-	}
-
-	key := fmt.Sprintf("enrichment:%s", userID.String())
-	data := pm.redis.Get(ctx, key).Val()
-	if data == "" {
-		return nil
-	}
-
-	// In a real implementation, this would deserialize the cached data
-	// For now, return nil to force fresh enrichment
 	return nil
 }
 
-// cacheEnrichment caches enrichment data
-func (pm *PluginManager) cacheEnrichment(ctx context.Context, userID uuid.UUID, result *EnrichmentResult) {
-	if pm.redis == nil {
+// Private methods
+
+func (m *Manager) loadPluginConfig(configPath string) error {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to read plugin config %s: %w", configPath, err)
+	}
+
+	var config struct {
+		Plugin string                 `json:"plugin"`
+		Config map[string]interface{} `json:"config"`
+	}
+
+	if err := json.Unmarshal(data, &config); err != nil {
+		return fmt.Errorf("failed to parse plugin config %s: %w", configPath, err)
+	}
+
+	m.logger.WithFields(logrus.Fields{
+		"plugin": config.Plugin,
+		"config": configPath,
+	}).Info("Loaded plugin configuration")
+
+	return nil
+}
+
+func (m *Manager) enrichWithPlugin(ctx context.Context, name string, plugin ExternalSystemPlugin, userID string, results chan<- *PluginEnrichmentResult) {
+	result := &PluginEnrichmentResult{
+		Plugin:    name,
+		Timestamp: time.Now(),
+	}
+
+	defer func() {
+		results <- result
+	}()
+
+	// Check plugin health
+	if !plugin.IsHealthy() {
+		result.Error = &PluginError{
+			Plugin:    name,
+			Operation: "enrich",
+			Message:   "plugin is unhealthy",
+			Code:      ErrorCodeConnection,
+			Retryable: true,
+		}
 		return
 	}
 
-	key := fmt.Sprintf("enrichment:%s", userID.String())
-	// In a real implementation, this would serialize and cache the result
-	// For now, just set a placeholder
-	pm.redis.Set(ctx, key, "cached", 1*time.Hour)
+	// Enrich with timeout
+	enrichment, err := m.enrichWithRetry(ctx, plugin, userID)
+	if err != nil {
+		result.Error = err
+		return
+	}
+
+	result.Enrichment = enrichment
+	result.Success = true
 }
 
-// Worker implementation
+func (m *Manager) enrichWithRetry(ctx context.Context, plugin ExternalSystemPlugin, userID string) (*UserEnrichment, error) {
+	var lastErr error
 
-func (w *Worker) start() {
-	w.manager.logger.Debug("Starting worker", "worker_id", w.id)
-
-	for {
+	for attempt := 0; attempt < m.maxRetries; attempt++ {
 		select {
-		case job := <-w.jobChan:
-			w.processJob(job)
-		case <-w.quit:
-			w.manager.logger.Debug("Stopping worker", "worker_id", w.id)
-			return
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
 		}
+
+		enrichment, err := plugin.EnrichUserProfile(userID)
+		if err == nil {
+			return enrichment, nil
+		}
+
+		lastErr = err
+
+		// Check if error is retryable
+		if pluginErr, ok := err.(*PluginError); ok && !pluginErr.Retryable {
+			break
+		}
+
+		// Wait before retry
+		if attempt < m.maxRetries-1 {
+			select {
+			case <-time.After(m.retryDelay * time.Duration(attempt+1)):
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		}
+	}
+
+	return nil, lastErr
+}
+
+func (m *Manager) combineEnrichments(results []*PluginEnrichmentResult) *CombinedEnrichment {
+	combined := &CombinedEnrichment{
+		Enrichments: make(map[string]*UserEnrichment),
+		Errors:      make(map[string]error),
+		Timestamp:   time.Now(),
+	}
+
+	var totalConfidence float64
+	var successCount int
+
+	for _, result := range results {
+		if result.Success && result.Enrichment != nil {
+			combined.Enrichments[result.Plugin] = result.Enrichment
+			totalConfidence += result.Enrichment.Confidence
+			successCount++
+		} else if result.Error != nil {
+			combined.Errors[result.Plugin] = result.Error
+		}
+	}
+
+	// Calculate overall confidence
+	if successCount > 0 {
+		combined.OverallConfidence = totalConfidence / float64(successCount)
+	}
+
+	combined.SuccessCount = successCount
+	combined.ErrorCount = len(combined.Errors)
+
+	return combined
+}
+
+func (m *Manager) getCachedEnrichment(userID string) *CombinedEnrichment {
+	if m.cache == nil {
+		return nil
+	}
+
+	key := fmt.Sprintf("plugin_enrichment:%s", userID)
+	data, err := m.cache.Get(context.Background(), key).Result()
+	if err != nil {
+		return nil
+	}
+
+	var enrichment CombinedEnrichment
+	if err := json.Unmarshal([]byte(data), &enrichment); err != nil {
+		m.logger.WithError(err).Warn("Failed to unmarshal cached enrichment")
+		return nil
+	}
+
+	return &enrichment
+}
+
+func (m *Manager) cacheEnrichment(userID string, enrichment *CombinedEnrichment) {
+	if m.cache == nil {
+		return
+	}
+
+	key := fmt.Sprintf("plugin_enrichment:%s", userID)
+	data, err := json.Marshal(enrichment)
+	if err != nil {
+		m.logger.WithError(err).Warn("Failed to marshal enrichment for caching")
+		return
+	}
+
+	if err := m.cache.Set(context.Background(), key, data, m.cacheTTL).Err(); err != nil {
+		m.logger.WithError(err).Warn("Failed to cache enrichment")
 	}
 }
 
-func (w *Worker) processJob(job *EnrichmentJob) {
-	startTime := time.Now()
-	result := &EnrichmentResult{
-		UserID:      job.UserID,
-		Enrichments: []*UserEnrichment{},
-		Errors:      make(map[string]error),
+func (m *Manager) validatePluginMetadata(metadata *PluginMetadata) error {
+	if metadata == nil {
+		return fmt.Errorf("metadata is required")
 	}
 
-	// Create context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), job.Timeout)
-	defer cancel()
+	if metadata.Name == "" {
+		return fmt.Errorf("plugin name is required")
+	}
 
-	// Process each plugin
-	for _, pluginName := range job.Plugins {
-		w.manager.mu.RLock()
-		plugin, exists := w.manager.plugins[pluginName]
-		status := w.manager.statuses[pluginName]
-		w.manager.mu.RUnlock()
+	if metadata.Version == "" {
+		return fmt.Errorf("plugin version is required")
+	}
 
+	return nil
+}
+
+func (m *Manager) validatePluginConfig(schema *ConfigSchema, config map[string]interface{}) error {
+	if schema == nil {
+		return nil // No validation required
+	}
+
+	// Check required properties
+	for _, required := range schema.Required {
+		if _, exists := config[required]; !exists {
+			return fmt.Errorf("required property %s is missing", required)
+		}
+	}
+
+	// Validate property types and constraints
+	for key, value := range config {
+		property, exists := schema.Properties[key]
 		if !exists {
-			result.Errors[pluginName] = fmt.Errorf("plugin not found")
-			continue
+			continue // Unknown properties are allowed
 		}
 
-		if !status.Healthy {
-			result.Errors[pluginName] = fmt.Errorf("plugin is unhealthy")
-			continue
-		}
-
-		// Process with plugin
-		enrichment, err := plugin.Process(ctx, job.UserID)
-		if err != nil {
-			result.Errors[pluginName] = err
-			w.manager.mu.Lock()
-			status.ErrorCount++
-			w.manager.mu.Unlock()
-			w.manager.logger.Warn("Plugin processing failed",
-				"plugin", pluginName, "user_id", job.UserID, "error", err)
-		} else {
-			result.Enrichments = append(result.Enrichments, enrichment)
-			w.manager.mu.Lock()
-			status.ProcessedCount++
-			w.manager.mu.Unlock()
+		if err := m.validatePropertyValue(property, value); err != nil {
+			return fmt.Errorf("invalid value for property %s: %w", key, err)
 		}
 	}
 
-	result.ProcessTime = time.Since(startTime)
+	return nil
+}
 
-	// Send result
-	select {
-	case job.ResultChan <- result:
-	default:
-		w.manager.logger.Warn("Failed to send job result", "user_id", job.UserID)
-	}
+func (m *Manager) validatePropertyValue(property *ConfigProperty, value interface{}) error {
+	// Type validation would go here
+	// This is a simplified version
+	return nil
+}
+
+// Supporting types
+
+type PluginEnrichmentResult struct {
+	Plugin     string          `json:"plugin"`
+	Success    bool            `json:"success"`
+	Enrichment *UserEnrichment `json:"enrichment,omitempty"`
+	Error      error           `json:"error,omitempty"`
+	Timestamp  time.Time       `json:"timestamp"`
+}
+
+type CombinedEnrichment struct {
+	Enrichments       map[string]*UserEnrichment `json:"enrichments"`
+	Errors            map[string]error           `json:"errors"`
+	OverallConfidence float64                    `json:"overall_confidence"`
+	SuccessCount      int                        `json:"success_count"`
+	ErrorCount        int                        `json:"error_count"`
+	Timestamp         time.Time                  `json:"timestamp"`
+}
+
+type PluginHealthStatus struct {
+	Name         string    `json:"name"`
+	Version      string    `json:"version"`
+	Healthy      bool      `json:"healthy"`
+	LastCheck    time.Time `json:"last_check"`
+	Capabilities []string  `json:"capabilities"`
 }

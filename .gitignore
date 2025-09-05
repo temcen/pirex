@@ -46,3 +46,4 @@ __pycache__/
 **/target
 **/target/**
 **/output
+models/*.bin

@@ -1,59 +1,302 @@
-# External System Plugins Configuration
+# Plugin Configuration Examples
+# Copy this file to plugins.yaml and customize for your environment
+
 plugins:
-  - name: crm_plugin
-    type: crm
-    enabled: true
-    timeout: 5s
-    retry_count: 3
-    config:
-      api_url: "https://api.crm-system.com/v1"
-      api_key: "${CRM_API_KEY}"
-      timeout: "5s"
-    environment:
-      CRM_API_KEY: "your-crm-api-key-here"
+  # Plugin Manager Configuration
+  manager:
+    plugin_dir: "./plugins"
+    auto_discovery: true
+    watch_interval: "30s"
+    cache_ttl: "30m"
+    timeout: "10s"
+    max_retries: 3
+    retry_delay: "1s"
 
-  - name: social_media_plugin
-    type: social_media
+  # CRM Plugin Configuration
+  crm:
     enabled: true
-    timeout: 10s
-    retry_count: 2
+    plugin_name: "crm-plugin"
     config:
+      # Salesforce Configuration
+      crm_type: "salesforce"
+      api_url: "https://your-instance.salesforce.com"
+      client_id: "${SALESFORCE_CLIENT_ID}"
+      client_secret: "${SALESFORCE_CLIENT_SECRET}"
+      username: "${SALESFORCE_USERNAME}"
+      password: "${SALESFORCE_PASSWORD}"
+      security_token: "${SALESFORCE_SECURITY_TOKEN}"
+      
+      # Alternative: HubSpot Configuration
+      # crm_type: "hubspot"
+      # api_url: "https://api.hubapi.com"
+      # api_key: "${HUBSPOT_API_KEY}"
+      
+      # Alternative: Pipedrive Configuration
+      # crm_type: "pipedrive"
+      # api_url: "https://your-company.pipedrive.com/api"
+      # api_key: "${PIPEDRIVE_API_KEY}"
+      
+      # Common settings
+      timeout: 30
+      rate_limit: 100  # requests per minute
+      cache_ttl: "1h"
+      
+      # Data mapping configuration
+      field_mapping:
+        user_id_field: "Email"
+        demographics:
+          age: "Age__c"
+          gender: "Gender__c"
+          location: "MailingCity"
+          occupation: "Title"
+          company: "Company"
+        
+        # Custom fields to extract
+        custom_fields:
+          - "Lead_Score__c"
+          - "Industry"
+          - "Annual_Revenue__c"
+          - "Number_of_Employees__c"
+
+  # Social Media Plugin Configuration
+  social_media:
+    enabled: true
+    plugin_name: "social-media-plugin"
+    config:
+      timeout: 30
       platforms:
-        twitter:
+        # Facebook/Meta Configuration
+        - name: "facebook"
+          enabled: true
+          api_url: "https://graph.facebook.com/v18.0"
+          app_id: "${FACEBOOK_APP_ID}"
+          app_secret: "${FACEBOOK_APP_SECRET}"
+          access_token: "${FACEBOOK_ACCESS_TOKEN}"
+          rate_limit: 200
+          
+        # Twitter/X Configuration
+        - name: "twitter"
+          enabled: true
+          api_url: "https://api.twitter.com"
           api_key: "${TWITTER_API_KEY}"
-          base_url: "https://api.twitter.com/2"
+          api_secret: "${TWITTER_API_SECRET}"
+          access_token: "${TWITTER_ACCESS_TOKEN}"
+          access_token_secret: "${TWITTER_ACCESS_TOKEN_SECRET}"
+          bearer_token: "${TWITTER_BEARER_TOKEN}"
+          rate_limit: 300
+          
+        # LinkedIn Configuration
+        - name: "linkedin"
+          enabled: false  # Requires special approval
+          api_url: "https://api.linkedin.com"
+          client_id: "${LINKEDIN_CLIENT_ID}"
+          client_secret: "${LINKEDIN_CLIENT_SECRET}"
+          access_token: "${LINKEDIN_ACCESS_TOKEN}"
+          rate_limit: 100
+          
+        # Instagram Configuration
+        - name: "instagram"
           enabled: true
-        facebook:
-          api_key: "${FACEBOOK_API_KEY}"
-          base_url: "https://graph.facebook.com/v18.0"
+          api_url: "https://graph.instagram.com"
+          access_token: "${INSTAGRAM_ACCESS_TOKEN}"
+          rate_limit: 200
+          
+        # TikTok Configuration
+        - name: "tiktok"
           enabled: false
-        linkedin:
-          api_key: "${LINKEDIN_API_KEY}"
-          base_url: "https://api.linkedin.com/v2"
-          enabled: true
-    environment:
-      TWITTER_API_KEY: "your-twitter-api-key"
-      FACEBOOK_API_KEY: "your-facebook-api-key"
-      LINKEDIN_API_KEY: "your-linkedin-api-key"
+          api_url: "https://open-api.tiktok.com"
+          client_key: "${TIKTOK_CLIENT_KEY}"
+          client_secret: "${TIKTOK_CLIENT_SECRET}"
+          access_token: "${TIKTOK_ACCESS_TOKEN}"
+          rate_limit: 100
 
-  - name: weather_plugin
-    type: contextual
-    enabled: false
-    timeout: 3s
-    retry_count: 1
+  # Google Analytics Plugin Configuration
+  analytics:
+    enabled: true
+    plugin_name: "google-analytics-plugin"
     config:
+      # Google Analytics 4 Configuration
+      property_id: "${GA4_PROPERTY_ID}"
+      credentials_file: "${GOOGLE_APPLICATION_CREDENTIALS}"
+      # Or use service account key
+      service_account_key: "${GA4_SERVICE_ACCOUNT_KEY}"
+      
+      # Data extraction settings
+      date_range: "30d"  # Last 30 days
+      metrics:
+        - "sessions"
+        - "pageviews"
+        - "bounceRate"
+        - "sessionDuration"
+        - "conversions"
+      
+      dimensions:
+        - "country"
+        - "city"
+        - "deviceCategory"
+        - "browser"
+        - "source"
+        - "medium"
+      
+      # Rate limiting
+      rate_limit: 100
+      timeout: 30
+      cache_ttl: "2h"
+
+  # Weather API Plugin Configuration
+  weather:
+    enabled: true
+    plugin_name: "weather-plugin"
+    config:
+      # OpenWeatherMap Configuration
+      provider: "openweathermap"
       api_url: "https://api.openweathermap.org/data/2.5"
-      api_key: "${WEATHER_API_KEY}"
-    environment:
-      WEATHER_API_KEY: "your-weather-api-key"
+      api_key: "${OPENWEATHER_API_KEY}"
+      
+      # Alternative: WeatherAPI Configuration
+      # provider: "weatherapi"
+      # api_url: "https://api.weatherapi.com/v1"
+      # api_key: "${WEATHERAPI_KEY}"
+      
+      # Settings
+      units: "metric"  # metric, imperial, kelvin
+      language: "en"
+      timeout: 10
+      rate_limit: 1000
+      cache_ttl: "15m"  # Weather data changes frequently
+      
+      # Location detection
+      default_location: "San Francisco, CA"
+      use_ip_geolocation: true
+      ip_service_url: "https://ipapi.co/json/"
 
-  - name: location_plugin
-    type: contextual
+  # Email Marketing Plugin Configuration
+  email_marketing:
     enabled: false
-    timeout: 2s
-    retry_count: 1
+    plugin_name: "email-marketing-plugin"
     config:
-      api_url: "https://api.ipgeolocation.io/ipgeo"
-      api_key: "${LOCATION_API_KEY}"
-    environment:
-      LOCATION_API_KEY: "your-location-api-key"
+      # Mailchimp Configuration
+      provider: "mailchimp"
+      api_url: "https://us1.api.mailchimp.com/3.0"
+      api_key: "${MAILCHIMP_API_KEY}"
+      
+      # Alternative: SendGrid Configuration
+      # provider: "sendgrid"
+      # api_url: "https://api.sendgrid.com/v3"
+      # api_key: "${SENDGRID_API_KEY}"
+      
+      # Settings
+      timeout: 30
+      rate_limit: 100
+      cache_ttl: "4h"
+      
+      # Data extraction
+      extract_segments: true
+      extract_campaigns: true
+      extract_engagement: true
+
+  # E-commerce Plugin Configuration
+  ecommerce:
+    enabled: false
+    plugin_name: "shopify-plugin"
+    config:
+      # Shopify Configuration
+      shop_domain: "${SHOPIFY_SHOP_DOMAIN}"
+      access_token: "${SHOPIFY_ACCESS_TOKEN}"
+      api_version: "2023-10"
+      
+      # Alternative: WooCommerce Configuration
+      # provider: "woocommerce"
+      # api_url: "https://your-store.com/wp-json/wc/v3"
+      # consumer_key: "${WC_CONSUMER_KEY}"
+      # consumer_secret: "${WC_CONSUMER_SECRET}"
+      
+      # Settings
+      timeout: 30
+      rate_limit: 40  # Shopify has strict limits
+      cache_ttl: "1h"
+      
+      # Data extraction
+      extract_orders: true
+      extract_products: true
+      extract_customer_data: true
+      order_history_days: 365
+
+# Plugin Registry Configuration
+registry:
+  enabled: true
+  auto_discovery: true
+  watch_interval: "30s"
+  
+  # Plugin marketplace settings (future feature)
+  marketplace:
+    enabled: false
+    url: "https://plugins.recommendation-engine.com"
+    auto_update: false
+    check_interval: "24h"
+
+# Health Monitoring Configuration
+health_monitoring:
+  enabled: true
+  check_interval: "30s"
+  
+  # Alert thresholds
+  thresholds:
+    error_rate: 0.05      # 5% error rate
+    response_time: "2s"   # 2 second response time
+    uptime: 0.99          # 99% uptime
+  
+  # Notification settings
+  notifications:
+    enabled: false
+    webhook_url: "${HEALTH_WEBHOOK_URL}"
+    email_alerts: false
+    email_recipients:
+      - "admin@example.com"
+
+# Performance Monitoring
+performance:
+  enabled: true
+  
+  # Metrics collection
+  metrics:
+    collect_timing: true
+    collect_memory: true
+    collect_errors: true
+    
+  # Performance thresholds
+  thresholds:
+    max_memory_mb: 100
+    max_response_time: "1s"
+    max_concurrent_requests: 100
+
+# Security Settings
+security:
+  # API key validation
+  validate_api_keys: true
+  
+  # Rate limiting per plugin
+  global_rate_limit: 1000  # requests per minute across all plugins
+  
+  # Data privacy
+  anonymize_logs: true
+  log_retention_days: 30
+  
+  # SSL/TLS settings
+  verify_ssl: true
+  min_tls_version: "1.2"
+
+# Development Settings
+development:
+  # Enable debug mode
+  debug: false
+  
+  # Mock external APIs for testing
+  use_mock_apis: false
+  mock_data_dir: "./test/mock_data"
+  
+  # Plugin hot reloading
+  hot_reload: false
+  
+  # Verbose logging
+  verbose_logging: false

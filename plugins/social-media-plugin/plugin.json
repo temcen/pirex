@@ -1,0 +1,190 @@
+{
+  "name": "social-media-plugin",
+  "version": "1.0.0",
+  "description": "Social media integration plugin for user profile enrichment from Facebook, Twitter, LinkedIn, Instagram, and TikTok",
+  "author": "Recommendation Engine Team",
+  "website": "https://github.com/recommendation-engine/plugins/social-media",
+  "license": "MIT",
+  "tags": ["social-media", "user-data", "interests", "demographics", "engagement"],
+  "capabilities": [
+    "social_demographics",
+    "interests_extraction",
+    "social_connections",
+    "engagement_metrics",
+    "activity_patterns",
+    "network_analysis",
+    "influence_scoring",
+    "content_preferences"
+  ],
+  "dependencies": [],
+  "min_engine_version": "1.0.0",
+  "config_schema": {
+    "properties": {
+      "platforms": {
+        "type": "array",
+        "description": "List of social media platforms to connect",
+        "required": true,
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Platform name",
+              "enum": ["facebook", "twitter", "linkedin", "instagram", "tiktok"],
+              "required": true
+            },
+            "enabled": {
+              "type": "boolean",
+              "description": "Whether this platform is enabled",
+              "default": true
+            },
+            "api_url": {
+              "type": "string",
+              "description": "Platform API base URL",
+              "required": true
+            },
+            "api_key": {
+              "type": "string",
+              "description": "API key for authentication",
+              "sensitive": true
+            },
+            "api_secret": {
+              "type": "string",
+              "description": "API secret for authentication",
+              "sensitive": true
+            },
+            "access_token": {
+              "type": "string",
+              "description": "Access token for authentication",
+              "sensitive": true
+            },
+            "refresh_token": {
+              "type": "string",
+              "description": "Refresh token for token renewal",
+              "sensitive": true
+            },
+            "rate_limit": {
+              "type": "integer",
+              "description": "Rate limit for this platform (requests per minute)",
+              "default": 100,
+              "minimum": 1,
+              "maximum": 1000
+            }
+          },
+          "required": ["name", "api_url"]
+        }
+      },
+      "timeout": {
+        "type": "integer",
+        "description": "Request timeout in seconds",
+        "default": 30,
+        "minimum": 1,
+        "maximum": 300
+      },
+      "cache_ttl": {
+        "type": "string",
+        "description": "Cache TTL duration (e.g., '2h', '30m')",
+        "default": "2h"
+      },
+      "data_extraction": {
+        "type": "object",
+        "description": "Data extraction configuration",
+        "properties": {
+          "extract_interests": {
+            "type": "boolean",
+            "description": "Extract user interests from posts and interactions",
+            "default": true
+          },
+          "extract_demographics": {
+            "type": "boolean",
+            "description": "Extract demographic information",
+            "default": true
+          },
+          "extract_network": {
+            "type": "boolean",
+            "description": "Extract social network information",
+            "default": true
+          },
+          "extract_engagement": {
+            "type": "boolean",
+            "description": "Extract engagement metrics",
+            "default": true
+          },
+          "max_posts": {
+            "type": "integer",
+            "description": "Maximum number of recent posts to analyze",
+            "default": 50,
+            "minimum": 1,
+            "maximum": 200
+          },
+          "analysis_period_days": {
+            "type": "integer",
+            "description": "Number of days to analyze for activity patterns",
+            "default": 30,
+            "minimum": 1,
+            "maximum": 365
+          }
+        }
+      },
+      "privacy": {
+        "type": "object",
+        "description": "Privacy and data handling settings",
+        "properties": {
+          "respect_privacy_settings": {
+            "type": "boolean",
+            "description": "Respect user privacy settings on platforms",
+            "default": true
+          },
+          "anonymize_connections": {
+            "type": "boolean",
+            "description": "Anonymize social connection data",
+            "default": true
+          },
+          "data_retention_days": {
+            "type": "integer",
+            "description": "Number of days to retain cached social data",
+            "default": 7,
+            "minimum": 1,
+            "maximum": 30
+          }
+        }
+      }
+    },
+    "required": ["platforms"]
+  },
+  "installation": {
+    "type": "builtin",
+    "binary": "internal"
+  },
+  "documentation": {
+    "readme": "README.md",
+    "examples": "examples/",
+    "api_reference": "docs/api.md",
+    "platform_guides": {
+      "facebook": "docs/facebook.md",
+      "twitter": "docs/twitter.md",
+      "linkedin": "docs/linkedin.md",
+      "instagram": "docs/instagram.md",
+      "tiktok": "docs/tiktok.md"
+    }
+  },
+  "support": {
+    "email": "support@recommendation-engine.com",
+    "issues": "https://github.com/recommendation-engine/issues",
+    "documentation": "https://docs.recommendation-engine.com/plugins/social-media"
+  },
+  "compliance": {
+    "gdpr_compliant": true,
+    "ccpa_compliant": true,
+    "data_processing_agreement": "https://recommendation-engine.com/dpa",
+    "privacy_policy": "https://recommendation-engine.com/privacy"
+  },
+  "metadata": {
+    "category": "data-enrichment",
+    "popularity": 0,
+    "downloads": 0,
+    "rating": 0.0,
+    "last_updated": "2024-01-15T00:00:00Z",
+    "checksum": "sha256:efgh5678..."
+  }
+}

@@ -1,0 +1,134 @@
+{
+  "name": "crm-plugin",
+  "version": "1.0.0",
+  "description": "CRM integration plugin for user profile enrichment from Salesforce, HubSpot, and Pipedrive",
+  "author": "Recommendation Engine Team",
+  "website": "https://github.com/recommendation-engine/plugins/crm",
+  "license": "MIT",
+  "tags": ["crm", "user-data", "demographics", "sales"],
+  "capabilities": [
+    "user_demographics",
+    "purchase_history",
+    "lead_scoring",
+    "interaction_tracking",
+    "company_data",
+    "sales_pipeline"
+  ],
+  "dependencies": [],
+  "min_engine_version": "1.0.0",
+  "config_schema": {
+    "properties": {
+      "crm_type": {
+        "type": "string",
+        "description": "Type of CRM system (salesforce, hubspot, pipedrive)",
+        "enum": ["salesforce", "hubspot", "pipedrive"],
+        "required": true
+      },
+      "api_url": {
+        "type": "string",
+        "description": "CRM API base URL",
+        "required": true,
+        "pattern": "^https?://.+"
+      },
+      "api_key": {
+        "type": "string",
+        "description": "API key for authentication",
+        "required": false,
+        "sensitive": true
+      },
+      "client_id": {
+        "type": "string",
+        "description": "OAuth client ID",
+        "required": false,
+        "sensitive": true
+      },
+      "client_secret": {
+        "type": "string",
+        "description": "OAuth client secret",
+        "required": false,
+        "sensitive": true
+      },
+      "username": {
+        "type": "string",
+        "description": "Username for authentication (Salesforce)",
+        "required": false
+      },
+      "password": {
+        "type": "string",
+        "description": "Password for authentication (Salesforce)",
+        "required": false,
+        "sensitive": true
+      },
+      "security_token": {
+        "type": "string",
+        "description": "Security token (Salesforce)",
+        "required": false,
+        "sensitive": true
+      },
+      "timeout": {
+        "type": "integer",
+        "description": "Request timeout in seconds",
+        "default": 30,
+        "minimum": 1,
+        "maximum": 300
+      },
+      "rate_limit": {
+        "type": "integer",
+        "description": "Rate limit (requests per minute)",
+        "default": 100,
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "cache_ttl": {
+        "type": "string",
+        "description": "Cache TTL duration (e.g., '1h', '30m')",
+        "default": "1h"
+      },
+      "field_mapping": {
+        "type": "object",
+        "description": "Mapping of CRM fields to standard fields",
+        "properties": {
+          "user_id_field": {
+            "type": "string",
+            "description": "Field to use as user identifier",
+            "default": "Email"
+          },
+          "demographics": {
+            "type": "object",
+            "description": "Demographic field mappings"
+          },
+          "custom_fields": {
+            "type": "array",
+            "description": "List of custom fields to extract",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "required": ["crm_type", "api_url"]
+  },
+  "installation": {
+    "type": "builtin",
+    "binary": "internal"
+  },
+  "documentation": {
+    "readme": "README.md",
+    "examples": "examples/",
+    "api_reference": "docs/api.md"
+  },
+  "support": {
+    "email": "support@recommendation-engine.com",
+    "issues": "https://github.com/recommendation-engine/issues",
+    "documentation": "https://docs.recommendation-engine.com/plugins/crm"
+  },
+  "metadata": {
+    "category": "data-enrichment",
+    "popularity": 0,
+    "downloads": 0,
+    "rating": 0.0,
+    "last_updated": "2024-01-15T00:00:00Z",
+    "checksum": "sha256:abcd1234..."
+  }
+}

@@ -22,8 +22,9 @@ require (
 	github.com/xeipuuv/gojsonschema v1.2.0
 	golang.org/x/text v0.28.0
 	gonum.org/v1/gonum v0.16.0
-	gopkg.in/yaml.v3 v3.0.1
 )
+
+require gopkg.in/yaml.v3 v3.0.1 // indirect
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
