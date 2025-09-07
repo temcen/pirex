@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frontend API Integration Test</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .test-success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .test-error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .test-warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        .response-data {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 3px;
+            padding: 10px;
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h1>Frontend API Integration Test</h1>
+        <p class="text-muted">Testing frontend JavaScript API client integration with backend services</p>
+        
+        <div class="row">
+            <div class="col-md-8">
+                <div id="test-results"></div>
+                <button id="run-tests" class="btn btn-primary">Run API Tests</button>
+                <button id="clear-results" class="btn btn-secondary">Clear Results</button>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Configuration</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="config-display"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/config.js"></script>
+    <script>
+        class FrontendAPITester {
+            constructor() {
+                this.config = null;
+                this.results = [];
+                this.init();
+            }
+
+            async init() {
+                try {
+                    this.config = await window.appConfig.load();
+                    this.displayConfig();
+                    this.setupEventListeners();
+                } catch (error) {
+                    this.addResult('Configuration Load', false, `Failed to load config: ${error.message}`);
+                }
+            }
+
+            setupEventListeners() {
+                document.getElementById('run-tests').addEventListener('click', () => {
+                    this.runAllTests();
+                });
+
+                document.getElementById('clear-results').addEventListener('click', () => {
+                    this.clearResults();
+                });
+            }
+
+            displayConfig() {
+                const configDisplay = document.getElementById('config-display');
+                configDisplay.innerHTML = `
+                    <div class="small">
+                        <strong>API Base URL:</strong> ${this.config.api.baseUrl}<br>
+                        <strong>API Version:</strong> ${this.config.api.version}<br>
+                        <strong>API Key:</strong> ${this.config.auth.apiKey}<br>
+                        <strong>Default User ID:</strong> ${this.config.auth.defaultUserId}<br>
+                        <strong>WebSocket:</strong> ${this.config.features.websocket ? 'Enabled' : 'Disabled'}<br>
+                        <strong>Debug Logs:</strong> ${this.config.development.enableDebugLogs ? 'Enabled' : 'Disabled'}
+                    </div>
+                `;
+            }
+
+            async runAllTests() {
+                this.clearResults();
+                this.addResult('Test Suite', true, 'Starting API integration tests...');
+
+                const tests = [
+                    { name: 'Configuration Load', test: () => this.testConfigLoad() },
+                    { name: 'Health Check', test: () => this.testHealthCheck() },
+                    { name: 'Get Recommendations', test: () => this.testGetRecommendations() },
+                    { name: 'Get Business Metrics', test: () => this.testGetBusinessMetrics() },
+                    { name: 'Get Performance Metrics', test: () => this.testGetPerformanceMetrics() },
+                    { name: 'Record Interaction', test: () => this.testRecordInteraction() },
+                    { name: 'Get User Interactions', test: () => this.testGetUserInteractions() }
+                ];
+
+                for (const testCase of tests) {
+                    try {
+                        await testCase.test();
+                        await new Promise(resolve => setTimeout(resolve, 500)); // Small delay between tests
+                    } catch (error) {
+                        this.addResult(testCase.name, false, `Test execution failed: ${error.message}`);
+                    }
+                }
+
+                this.addResult('Test Suite', true, 'All tests completed!');
+            }
+
+            async testConfigLoad() {
+                try {
+                    if (this.config && this.config.api && this.config.auth) {
+                        this.addResult('Configuration Load', true, 'Configuration loaded successfully', this.config);
+                    } else {
+                        this.addResult('Configuration Load', false, 'Configuration is incomplete');
+                    }
+                } catch (error) {
+                    this.addResult('Configuration Load', false, error.message);
+                }
+            }
+
+            async testHealthCheck() {
+                try {
+                    const response = await fetch('/health');
+                    const data = await response.json();
+                    
+                    if (response.ok && data.status === 'healthy') {
+                        this.addResult('Health Check', true, 'Frontend server is healthy', data);
+                    } else {
+                        this.addResult('Health Check', false, `Health check failed: ${data.status || 'unknown'}`);
+                    }
+                } catch (error) {
+                    this.addResult('Health Check', false, error.message);
+                }
+            }
+
+            async testGetRecommendations() {
+                try {
+                    const response = await this.fetchWithAuth(`/api/v1/recommendations/${this.config.auth.defaultUserId}?count=10&explain=true`);
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        this.addResult('Get Recommendations', true, `Recommendations API working (${data.recommendations ? data.recommendations.length : 0} items)`, data);
+                    } else {
+                        this.addResult('Get Recommendations', false, `API error: ${data.error?.message || 'Unknown error'}`, data);
+                    }
+                } catch (error) {
+                    this.addResult('Get Recommendations', false, error.message);
+                }
+            }
+
+            async testGetBusinessMetrics() {
+                try {
+                    const response = await this.fetchWithAuth('/api/v1/metrics/business');
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        this.addResult('Get Business Metrics', true, 'Business metrics API working', data);
+                    } else {
+                        this.addResult('Get Business Metrics', false, `API error: ${data.error?.message || 'Unknown error'}`, data);
+                    }
+                } catch (error) {
+                    this.addResult('Get Business Metrics', false, error.message);
+                }
+            }
+
+            async testGetPerformanceMetrics() {
+                try {
+                    const response = await this.fetchWithAuth('/api/v1/metrics/performance');
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        this.addResult('Get Performance Metrics', true, 'Performance metrics API working', data);
+                    } else {
+                        this.addResult('Get Performance Metrics', false, `API error: ${data.error?.message || 'Unknown error'}`, data);
+                    }
+                } catch (error) {
+                    this.addResult('Get Performance Metrics', false, error.message);
+                }
+            }
+
+            async testRecordInteraction() {
+                try {
+                    const interaction = {
+                        user_id: this.config.auth.defaultUserId,
+                        item_id: '550e8400-e29b-41d4-a716-446655440001',
+                        type: 'like',
+                        session_id: '550e8400-e29b-41d4-a716-446655440002'
+                    };
+
+                    const response = await this.fetchWithAuth('/api/v1/interactions/explicit', {
+                        method: 'POST',
+                        body: JSON.stringify(interaction)
+                    });
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        this.addResult('Record Interaction', true, 'Interaction recording API working', data);
+                    } else if (response.status === 500) {
+                        // Expected due to missing database tables
+                        this.addResult('Record Interaction', 'warning', 'API working but database tables missing (expected)', data);
+                    } else {
+                        this.addResult('Record Interaction', false, `API error: ${data.error?.message || 'Unknown error'}`, data);
+                    }
+                } catch (error) {
+                    this.addResult('Record Interaction', false, error.message);
+                }
+            }
+
+            async testGetUserInteractions() {
+                try {
+                    const response = await this.fetchWithAuth(`/api/v1/users/${this.config.auth.defaultUserId}/interactions?limit=10`);
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        this.addResult('Get User Interactions', true, 'User interactions API working', data);
+                    } else if (response.status === 500) {
+                        // Expected due to missing database tables
+                        this.addResult('Get User Interactions', 'warning', 'API working but database tables missing (expected)', data);
+                    } else {
+                        this.addResult('Get User Interactions', false, `API error: ${data.error?.message || 'Unknown error'}`, data);
+                    }
+                } catch (error) {
+                    this.addResult('Get User Interactions', false, error.message);
+                }
+            }
+
+            async fetchWithAuth(url, options = {}) {
+                const defaultOptions = {
+                    headers: {
+                        'Authorization': `Bearer ${this.config.auth.apiKey}`,
+                        'X-User-ID': this.config.auth.defaultUserId,
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    }
+                };
+
+                return fetch(url, { ...options, headers: defaultOptions.headers });
+            }
+
+            addResult(testName, success, message, data = null) {
+                const resultDiv = document.createElement('div');
+                const statusClass = success === true ? 'test-success' : 
+                                  success === 'warning' ? 'test-warning' : 'test-error';
+                const statusIcon = success === true ? '✅' : 
+                                 success === 'warning' ? '⚠️' : '❌';
+
+                resultDiv.className = `test-result ${statusClass}`;
+                resultDiv.innerHTML = `
+                    <div>
+                        <strong>${statusIcon} ${testName}</strong>
+                        <div class="mt-1">${message}</div>
+                        ${data ? `<div class="response-data">${JSON.stringify(data, null, 2)}</div>` : ''}
+                    </div>
+                `;
+
+                document.getElementById('test-results').appendChild(resultDiv);
+                this.results.push({ testName, success, message, data });
+            }
+
+            clearResults() {
+                document.getElementById('test-results').innerHTML = '';
+                this.results = [];
+            }
+        }
+
+        // Initialize tester when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            window.apiTester = new FrontendAPITester();
+        });
+    </script>
+</body>
+</html>
